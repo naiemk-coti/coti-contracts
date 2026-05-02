@@ -42,6 +42,14 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
 
     event ERC20Rescued(address indexed token, address indexed to, uint256 amount);
 
+    /// @dev Rescuing the live public bridged `token` uses the same pause gate as {PrivacyBridgeCotiNative.rescueNative}.
+    modifier whenBridgedTokenRescue(address _token) {
+        if (_token == address(token)) {
+            _requirePaused();
+        }
+        _;
+    }
+
     /**
      * @notice Compute the dynamic fee in COTI for an ERC20 bridge operation
      * @param tokenAmount The amount of ERC20 tokens being bridged
@@ -228,18 +236,17 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
     /**
      * @dev Rescue ERC20 tokens sent to the contract (excluding private tokens).
      *      Sends to the predefined rescueRecipient address.
-     *      The admin (owner) is fully responsible for invoking this function correctly.
-     *      Misuse can remove bridge liquidity backing user deposits.
-     *      Note: unless new p.tokens are issued, p.tokens can be reused across multiple bridges.
+     *      For the live public bridged `token`, the bridge must be {paused} first so this path is
+     *      reserved for controlled operations (e.g. migrating liquidity to a new bridge deployment).
+     *      Other ERC20s can still be rescued while unpaused (airdrops / mistaken sends).
      */
     function rescueERC20(
         address _token,
         uint256 amount
-    ) external onlyOwner nonReentrant {
+    ) external onlyOwner nonReentrant whenBridgedTokenRescue(_token) {
         if (amount == 0) revert AmountZero();
-        
-        if ( _token == address(privateToken))
-            revert CannotRescueBridgeToken();
+
+        if (_token == address(privateToken)) revert CannotRescueBridgeToken();
 
         IERC20(_token).safeTransfer(rescueRecipient, amount);
 

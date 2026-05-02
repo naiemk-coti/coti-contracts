@@ -13,7 +13,7 @@ import "../oracle/ICotiPriceConsumer.sol";
  * @notice Base contract for Privacy Bridge contracts containing common logic
  * @dev Trust assumptions: (1) MPC precompile at expected address is correct and non-malicious.
  *      (2) Private token implementation is trusted and only authorized minters can mint.
- *      (3) Owner operations (limits, fees, pause, withdraw fees, rescue) are centralized; consider timelock/multisig for sensitive actions.
+ *      (3) Owner operations (limits, fees, pause, withdraw fees, rescue) are centralized; 
  *      (4) Any new derived bridge must override withdrawFees to perform the actual transfer; base implementation reverts.
  */
 abstract contract PrivacyBridge is ReentrancyGuard, Pausable, Ownable, AccessControlEnumerable {

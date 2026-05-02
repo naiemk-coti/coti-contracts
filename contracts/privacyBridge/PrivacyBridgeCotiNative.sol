@@ -11,7 +11,6 @@ import "../token/PrivateERC20/tokens/PrivateCOTI.sol";
 contract PrivacyBridgeCotiNative is PrivacyBridge {
     PrivateCOTI public privateCoti;
 
-    error ExceedsRescueableAmount();
     error NativeCotiFeeNotApplicable();
 
     event NativeRescued(address indexed to, uint256 amount);
@@ -217,22 +216,24 @@ contract PrivacyBridgeCotiNative is PrivacyBridge {
     }
 
     /**
-     * @dev Rescue native COTI coins mistakenly sent to the contract.
-     *      Only excess over the accumulated fee reserve can be rescued.
-     *      Sends to the predefined rescueRecipient address.
-     *      The admin (owner) is fully responsible for invoking this function correctly.
-     *      Misuse can remove bridge liquidity backing user deposits.
-     * @param amount Amount of coins to rescue
-     * @notice Only the owner can call this function
+     * @dev Rescue native COTI held by the contract to {rescueRecipient} (e.g. a new bridge deployment).
+     *      The bridge must be {paused} first, matching the policy on {PrivacyBridgeERC20.rescueERC20}
+     *      for the live bridged token: no rescue of principal balance during normal operation.
+     *      After a partial rescue, {accumulatedCotiFees} is capped to the remaining balance so fee
+     *      accounting cannot exceed what is still on the contract (full migration zeros both).
+     * @param amount Amount of native currency to send (typically full balance for migration).
      */
-    function rescueNative(uint256 amount) external onlyOwner nonReentrant {
+    function rescueNative(uint256 amount) external onlyOwner nonReentrant whenPaused {
         if (amount == 0) revert AmountZero();
         if (amount > address(this).balance) revert InsufficientEthBalance();
-        if (address(this).balance < accumulatedCotiFees) revert InsufficientEthBalance();
-        if (amount > address(this).balance - accumulatedCotiFees) revert ExceedsRescueableAmount();
 
         (bool success, ) = rescueRecipient.call{value: amount}("");
         if (!success) revert EthTransferFailed();
+
+        uint256 remaining = address(this).balance;
+        if (accumulatedCotiFees > remaining) {
+            accumulatedCotiFees = remaining;
+        }
 
         emit NativeRescued(rescueRecipient, amount);
     }
