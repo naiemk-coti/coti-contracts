@@ -16,6 +16,9 @@ import "../oracle/ICotiPriceConsumer.sol";
  *      (3) Owner operations (limits, fees, pause, withdraw fees, rescue) are centralized; 
  *      (4) Any new derived bridge must override withdrawFees to perform the actual transfer; base implementation reverts.
  *      (5) Oracle prices are trusted; {maxOracleAge} bounds staleness of `lastUpdated` when set (does not remove oracle trust).
+ *      (6) {totalUserLiability} is bridge bookkeeping for transparency: it tracks net user obligations from mint/burn
+ *          paths in this contract. It helps depositors/observers reason about exposure on-chain; it is not a
+ *          cryptographic proof of MPC/private-token balances and can diverge if the token layer misbehaves.
  */
 abstract contract PrivacyBridge is ReentrancyGuard, Pausable, Ownable, AccessControlEnumerable {
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
@@ -52,8 +55,10 @@ abstract contract PrivacyBridge is ReentrancyGuard, Pausable, Ownable, AccessCon
     /// @notice Accumulated native COTI fees (used only by ERC20 bridges for per-operation native fee; not used by native bridge)
     uint256 public accumulatedCotiFees;
 
-    /// @notice Outstanding user liability — net amount minted minus net amount released.
-    ///         Represents the total amount owed to users if they all withdraw.
+    /// @notice On-chain aggregate of bridge-issued user obligations from deposit/withdraw mint and burn paths
+    ///         (native: net private minted; native withdraw: private burned; ERC20: public received in / amount out).
+    ///         Intended for transparency so depositors and tooling can read how much liability the bridge tracks
+    ///         in its own accounting. This does not attest to MPC correctness or encrypted token balances.
     uint256 public totalUserLiability;
 
     /// @notice Fee divisor (1,000,000)

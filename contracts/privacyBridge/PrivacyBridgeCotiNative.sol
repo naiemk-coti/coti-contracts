@@ -140,7 +140,8 @@ contract PrivacyBridgeCotiNative is PrivacyBridge {
         if (address(this).balance < publicAmount)
             revert InsufficientEthBalance();
 
-        totalUserLiability -= publicAmount;
+        // Extinguish liability for the full private amount burned (fee stays with bridge as native revenue).
+        totalUserLiability -= amount;
 
         // Pull and burn private tokens
         IPrivateERC20(address(privateCoti)).transferFrom(
