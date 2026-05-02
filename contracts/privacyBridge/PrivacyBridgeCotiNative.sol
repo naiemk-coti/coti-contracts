@@ -2,6 +2,7 @@
 pragma solidity ^0.8.19;
 
 import "./PrivacyBridge.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "../token/PrivateERC20/tokens/PrivateCOTI.sol";
 
 /**
@@ -44,9 +45,9 @@ contract PrivacyBridgeCotiNative is PrivacyBridge {
         (uint256 cotiUsdRate, uint256 cotiLastUpdated,) = ICotiPriceConsumer(priceOracle).getPriceWithMeta("COTI");
         _requirePositiveOracleRate(cotiUsdRate);
         _requireOracleFreshness(cotiLastUpdated);
-        uint256 txValueUsd = (cotiAmount * cotiUsdRate) / 1e18;
-        uint256 percentageFeeUsd = (txValueUsd * percentageBps) / FEE_DIVISOR;
-        uint256 percentageFeeCoti = (percentageFeeUsd * 1e18) / cotiUsdRate;
+        uint256 txValueUsd = Math.mulDiv(cotiAmount, cotiUsdRate, 1e18);
+        uint256 percentageFeeUsd = Math.mulDiv(txValueUsd, percentageBps, FEE_DIVISOR);
+        uint256 percentageFeeCoti = Math.mulDiv(percentageFeeUsd, 1e18, cotiUsdRate);
         return _calculateDynamicFee(percentageFeeCoti, fixedFee, maxFee);
     }
 

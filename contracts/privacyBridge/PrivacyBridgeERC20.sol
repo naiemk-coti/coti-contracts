@@ -2,6 +2,7 @@
 pragma solidity ^0.8.19;
 
 import "./PrivacyBridge.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../token/PrivateERC20/IPrivateERC20.sol";
@@ -73,9 +74,9 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
         _requireOracleFreshness(tokenLastUpdated);
         _requireOracleFreshness(cotiLastUpdated);
         uint8 tokenDecimals = IHasDecimals(address(token)).decimals();
-        uint256 txValueUsd = (tokenAmount * tokenUsdRate) / (10 ** tokenDecimals);
-        uint256 percentageFeeUsd = (txValueUsd * percentageBps) / FEE_DIVISOR;
-        uint256 percentageFeeCoti = (percentageFeeUsd * 1e18) / cotiUsdRate;
+        uint256 txValueUsd = Math.mulDiv(tokenAmount, tokenUsdRate, 10 ** tokenDecimals);
+        uint256 percentageFeeUsd = Math.mulDiv(txValueUsd, percentageBps, FEE_DIVISOR);
+        uint256 percentageFeeCoti = Math.mulDiv(percentageFeeUsd, 1e18, cotiUsdRate);
         return _calculateDynamicFee(percentageFeeCoti, fixedFee, maxFee);
     }
 
