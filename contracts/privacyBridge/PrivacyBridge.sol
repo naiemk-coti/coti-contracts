@@ -104,8 +104,9 @@ abstract contract PrivacyBridge is ReentrancyGuard, Pausable, Ownable, AccessCon
     /// @notice CotiPriceConsumer contract address
     address public priceOracle;
 
-    /// @notice Default max oracle age (30 minutes), matching the production oracle update interval.
-    uint256 public constant DEFAULT_MAX_ORACLE_AGE = 30 minutes;
+    /// @notice Default max oracle age: nominal ~30 minute feed cadence plus a 5 minute buffer so slightly delayed
+    ///         updates or inclusion lag do not spuriously revert with {OraclePriceStale}.
+    uint256 public constant DEFAULT_MAX_ORACLE_AGE = 30 minutes + 5 minutes;
 
     /// @notice Maximum allowed `block.timestamp - oracle lastUpdated` (seconds). Initialized to {DEFAULT_MAX_ORACLE_AGE}; set to 0 to disable.
     uint256 public maxOracleAge;
@@ -126,7 +127,7 @@ abstract contract PrivacyBridge is ReentrancyGuard, Pausable, Ownable, AccessCon
     error OracleTimestampMismatch(uint256 expected, uint256 actual);
     error PriceOracleNotSet();
     error InvalidOraclePrice();
-    error OraclePriceStale();
+    error OraclePriceStale(uint256 oracleLastUpdated, uint256 blockTimestamp, uint256 maxOracleAge);
     error OracleLastUpdatedInFuture(uint256 lastUpdated);
     error FeeRecipientNotSet();
     error AddressBlacklisted(address account);
@@ -404,7 +405,8 @@ abstract contract PrivacyBridge is ReentrancyGuard, Pausable, Ownable, AccessCon
         uint256 maxAge = maxOracleAge;
         if (maxAge == 0) return;
         if (lastUpdated > block.timestamp) revert OracleLastUpdatedInFuture(lastUpdated);
-        if (block.timestamp - lastUpdated > maxAge) revert OraclePriceStale();
+        uint256 nowTs = block.timestamp;
+        if (nowTs - lastUpdated > maxAge) revert OraclePriceStale(lastUpdated, nowTs, maxAge);
     }
 
     /**
@@ -511,7 +513,7 @@ abstract contract PrivacyBridge is ReentrancyGuard, Pausable, Ownable, AccessCon
 
     /**
      * @notice Set the maximum allowed age of oracle `lastUpdated` (seconds) relative to `block.timestamp`.
-     * @param _maxOracleAge Use 0 to disable staleness checks; default after deploy is 30 minutes ({DEFAULT_MAX_ORACLE_AGE}).
+     * @param _maxOracleAge Use 0 to disable staleness checks; default after deploy is {DEFAULT_MAX_ORACLE_AGE} (30 min cadence + 5 min buffer).
      */
     function setMaxOracleAge(uint256 _maxOracleAge) external onlyOwner {
         maxOracleAge = _maxOracleAge;
