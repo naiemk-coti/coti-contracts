@@ -136,7 +136,8 @@ abstract contract PrivacyBridge is ReentrancyGuard, Pausable, Ownable, AccessCon
     /// @notice Addresses blocked from depositing or withdrawing
     mapping(address => bool) public blacklisted;
 
-    /// @notice Native COTI excess from `msg.value` after dynamic fees when the push-refund to `msg.sender` failed (ERC20 bridges).
+    /// @notice Per-user native COTI credited when an ERC20 bridge excess refund could not be pushed to `msg.sender` (e.g. smart contract wallets).
+    /// @dev Indexed by the same address that called `deposit`/`withdraw`. Pull via {claimRefundableNativeExcess}; listen for {NativeRefundExcessPushFailed}.
     mapping(address => uint256) public refundableNativeExcess;
 
     event Blacklisted(address indexed account, address indexed by);
@@ -377,8 +378,11 @@ abstract contract PrivacyBridge is ReentrancyGuard, Pausable, Ownable, AccessCon
     }
 
     /**
-     * @dev Credits a user when a push-style native refund failed (e.g. smart wallet rejects ETH).
-     *      Funds stay in the contract until {claimRefundableNativeExcess}.
+     * @dev Credits `user` when the ERC20 bridge’s push-refund of native excess after fee collection returns false
+     *      (common with smart contract accounts / AA wallets that reject unsolicited ETH, or `receive`/`fallback`
+     *      reverts). Funds remain on the bridge until {claimRefundableNativeExcess}. UIs should watch
+     *      {NativeRefundExcessPushFailed} and prompt the same `user` to claim; the amount is not in
+     *      {accumulatedCotiFees} and cannot be swept as protocol fees.
      */
     function _creditRefundableNativeExcess(address user, uint256 amount) internal {
         refundableNativeExcess[user] += amount;
@@ -386,8 +390,11 @@ abstract contract PrivacyBridge is ReentrancyGuard, Pausable, Ownable, AccessCon
     }
 
     /**
-     * @notice Pull native COTI previously credited after a failed excess refund during ERC20 bridge fee collection.
-     * @dev Not gated by {whenPaused} so users can recover; still {notBlacklisted}. Restores credit if the send fails.
+     * @notice Pull native COTI previously credited when the ERC20 bridge could not push the fee excess to you.
+     * @dev Same push pattern as the original refund: `msg.sender.call{value: amount}`. If your wallet still
+     *      rejects ETH, the call reverts with {EthTransferFailed} and your credit is restored so you can try
+     *      again from an address that accepts native transfers (the protocol does not support forwarding to a
+     *      third-party payout address). Not gated by {whenPaused}; {notBlacklisted} applies ({AddressBlacklisted}).
      */
     function claimRefundableNativeExcess() external nonReentrant notBlacklisted {
         uint256 amount = refundableNativeExcess[msg.sender];

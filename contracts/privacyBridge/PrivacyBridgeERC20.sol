@@ -133,9 +133,11 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
      * @notice Collect the dynamic native COTI fee from msg.value and refund any excess
      * @param fee The computed fee in native COTI
      * @dev Reverts with {InsufficientCotiFee} if msg.value < fee.
-     *      Excess above fee is refunded best-effort; if the push-refund fails, the excess is credited to
-     *      {refundableNativeExcess} for `msg.sender` and can be pulled via {claimRefundableNativeExcess}
-     *      (it is not mixed into {accumulatedCotiFees} so it cannot be swept as protocol fees).
+     *      Excess above `fee` is sent back to `msg.sender` with a plain `call` (no receive hook guarantee).
+     *      Smart wallets or contracts that revert or return false on unsolicited ETH will not receive the push;
+     *      the excess is then credited to {refundableNativeExcess}[msg.sender] and emits `NativeRefundExcessPushFailed`
+     *      (see {PrivacyBridge._creditRefundableNativeExcess} and {PrivacyBridge.claimRefundableNativeExcess}). Excess
+     *      is never added to {accumulatedCotiFees}.
      */
     function _collectDynamicNativeFee(uint256 fee) internal {
         if (msg.value < fee) revert InsufficientCotiFee();
@@ -183,8 +185,8 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
      * @param amount Amount of public ERC20 tokens to deposit
      * @param cotiOracleTimestamp COTI `lastUpdated` from the latest `estimateDepositFee` (must still equal on-chain at execution).
      * @param tokenOracleTimestamp Token `lastUpdated` from the same estimate (must still equal on-chain at execution).
-     * @dev Native COTI fee: send msg.value >= computed fee. Excess is refunded best-effort. If the Band row advances
-     *      before inclusion, tx reverts with {OracleTimestampMismatch}—re-estimate and resubmit (see {_validateOracleTimestamps}).
+     * @dev Native COTI fee: send msg.value >= computed fee. Excess native is push-refunded then pull-credited on failure
+     *      ({_collectDynamicNativeFee}). If the Band row advances before inclusion, tx reverts with {OracleTimestampMismatch}—re-estimate and resubmit (see {_validateOracleTimestamps}).
      */
     function deposit(
         uint256 amount,
@@ -227,7 +229,7 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
      * @param tokenOracleTimestamp Token `lastUpdated` from the same estimate (must still equal on-chain at execution).
      * @dev Requires prior approval on the private token. Send `msg.value >= fee`; native fee is
      *      collected only after the public token transfer succeeds (mirrors {deposit} ordering). Oracle
-     *      timestamp rules match {deposit} / {_validateOracleTimestamps}.
+     *      timestamp rules match {deposit} / {_validateOracleTimestamps}. Native excess handling matches {deposit}.
      */
     function withdraw(
         uint256 amount,
