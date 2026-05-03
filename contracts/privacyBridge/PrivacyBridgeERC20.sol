@@ -15,7 +15,10 @@ interface IHasDecimals {
 /**
  * @dev Abstract base contract for ERC20 Token Privacy Bridges
  * @dev Handles the logic for bridging ERC20 tokens to their private counterparts.
- * @dev The public ERC20 token must be standard (no fee-on-transfer, no rebasing); same decimals as private token.
+ * @dev The public ERC20 must match standard transfer semantics: {safeTransferFrom} of `amount` must
+ *      increase the bridge balance by exactly `amount` ({UnexpectedTransferBalance} otherwise). This
+ *      rejects common fee-on-transfer / deflationary patterns. Rebasing, blacklist hooks, and other
+ *      non-standard behavior remain unsupported—deployment must still use a suitable asset.
  */
 abstract contract PrivacyBridgeERC20 is PrivacyBridge {
     using SafeERC20 for IERC20;
@@ -43,6 +46,8 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
     error InvalidTokenSender();
     error NativeFeeRequiredForTransferAndCallWithdraw();
     error DecimalsMismatch();
+    /// @notice Pulled balance increase did not match `amount` (e.g. fee-on-transfer or deflationary token).
+    error UnexpectedTransferBalance(uint256 expected, uint256 received);
     event ERC20Rescued(address indexed token, address indexed to, uint256 amount);
 
     /**
@@ -178,9 +183,9 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
     }
 
     /**
-     * @dev Asset support is limited to standard ERC20 tokens only.
-     *      Fee-on-transfer, rebasing, or non-standard ERC20 tokens are not supported
-     *      and may result in incorrect balances or loss of funds.
+     * @dev Pulls public tokens before collecting the native COTI fee so a non-standard transfer
+     *      (e.g. fee-on-transfer) reverts before debiting `msg.value`, and insufficient `msg.value`
+     *      still reverts the whole tx including the token transfer.
      */
     function _deposit(uint256 amount, uint256 cotiOracleTimestamp, uint256 tokenOracleTimestamp) internal {
         if (!isDepositEnabled) revert DepositDisabled();
@@ -188,18 +193,15 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
         _checkDepositLimits(amount);
         _validateOracleTimestamps(cotiOracleTimestamp, tokenOracleTimestamp, tokenSymbol);
 
-        // Step 1: compute dynamic fee in COTI
         uint256 fee = _computeErc20Fee(amount, depositFixedFee, depositPercentageBps, depositMaxFee);
 
-        // Step 2: collect fee from msg.value (refunds excess to sender)
-        _collectDynamicNativeFee(fee);
-
-        // Step 3: pull full token amount from user
         uint256 balBefore = token.balanceOf(address(this));
         token.safeTransferFrom(msg.sender, address(this), amount);
         uint256 received = token.balanceOf(address(this)) - balBefore;
+        if (received != amount) revert UnexpectedTransferBalance(amount, received);
 
-        // Step 4: mint full private token amount
+        _collectDynamicNativeFee(fee);
+
         totalUserLiability += received;
         privateToken.mint(msg.sender, received);
 
@@ -211,7 +213,8 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
      * @param amount Amount of private tokens to burn
      * @param cotiOracleTimestamp COTI `lastUpdated` from estimate (must equal on-chain at execution; COTI UI avoids submit near refresh).
      * @param tokenOracleTimestamp Token `lastUpdated` from estimate (must equal on-chain at execution).
-     * @dev Requires prior approval on the private token. Native COTI fee: send msg.value >= computed fee; excess refunded best-effort.
+     * @dev Requires prior approval on the private token. Send `msg.value >= fee`; native fee is
+     *      collected only after the public token transfer succeeds (mirrors {deposit} ordering).
      */
     function withdraw(
         uint256 amount,
@@ -221,29 +224,31 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
         _withdraw(amount, cotiOracleTimestamp, tokenOracleTimestamp);
     }
 
+    /**
+     * @dev Mirrors {_deposit}: native fee is collected only after the ERC20 leg succeeds by standard
+     *      semantics (here: burn + public transfer with full `userGain`). Insufficient `msg.value`
+     *      then reverts the entire withdrawal including private burn and public transfer.
+     */
     function _withdraw(uint256 amount, uint256 cotiOracleTimestamp, uint256 tokenOracleTimestamp) internal {
         if (amount == 0) revert AmountZero();
         _checkWithdrawLimits(amount);
         _validateOracleTimestamps(cotiOracleTimestamp, tokenOracleTimestamp, tokenSymbol);
 
-        // Step 1: compute dynamic fee in COTI
         uint256 fee = _computeErc20Fee(amount, withdrawFixedFee, withdrawPercentageBps, withdrawMaxFee);
 
-        // Step 2: collect fee from msg.value (refunds excess to sender)
-        _collectDynamicNativeFee(fee);
-
-        // Step 3: verify bridge has enough liquidity
         uint256 bridgeBalance = token.balanceOf(address(this));
-        if (bridgeBalance < amount)
-            revert InsufficientBridgeLiquidity();
+        if (bridgeBalance < amount) revert InsufficientBridgeLiquidity();
 
-        // Step 4: pull and burn full private token amount
         totalUserLiability -= amount;
         privateToken.transferFrom(msg.sender, address(this), amount);
         privateToken.burn(amount);
 
-        // Step 5: release full public token amount to user
+        uint256 userBalBefore = token.balanceOf(msg.sender);
         token.safeTransfer(msg.sender, amount);
+        uint256 userGain = token.balanceOf(msg.sender) - userBalBefore;
+        if (userGain != amount) revert UnexpectedTransferBalance(amount, userGain);
+
+        _collectDynamicNativeFee(fee);
 
         emit Withdraw(msg.sender, amount, amount);
     }
