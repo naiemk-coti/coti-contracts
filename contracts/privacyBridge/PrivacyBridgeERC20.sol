@@ -99,6 +99,8 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
      * @return cotiLastUpdated    COTI oracle data last update timestamp
      * @return tokenLastUpdated   Token oracle data last update timestamp
      * @return blockTimestamp     Third field from the COTI oracle row (same as pre-refactor behavior)
+     * @dev Pass the returned `cotiLastUpdated` and `tokenLastUpdated` verbatim into {deposit}/{withdraw} together
+     *      with the same `tokenAmount` path; see {PrivacyBridge._validateOracleTimestamps} for strict equality UX.
      */
     function estimateDepositFee(uint256 tokenAmount) external view returns (uint256 fee, uint256 cotiLastUpdated, uint256 tokenLastUpdated, uint256 blockTimestamp) {
         (fee, cotiLastUpdated, tokenLastUpdated, blockTimestamp) = _computeErc20FeeAndMeta(
@@ -116,6 +118,7 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
      * @return cotiLastUpdated    COTI oracle data last update timestamp
      * @return tokenLastUpdated   Token oracle data last update timestamp
      * @return blockTimestamp     Third field from the COTI oracle row (same as pre-refactor behavior)
+     * @dev Same timestamp handoff as {estimateDepositFee}: use return values unchanged on the subsequent {withdraw}.
      */
     function estimateWithdrawFee(uint256 tokenAmount) external view returns (uint256 fee, uint256 cotiLastUpdated, uint256 tokenLastUpdated, uint256 blockTimestamp) {
         (fee, cotiLastUpdated, tokenLastUpdated, blockTimestamp) = _computeErc20FeeAndMeta(
@@ -178,9 +181,10 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
     /**
      * @notice Deposit public ERC20 tokens to receive equivalent private tokens
      * @param amount Amount of public ERC20 tokens to deposit
-     * @param cotiOracleTimestamp COTI `lastUpdated` from estimate (must equal on-chain at execution; COTI UI avoids submit near refresh).
-     * @param tokenOracleTimestamp Token `lastUpdated` from estimate (must equal on-chain at execution).
-     * @dev Native COTI fee: send msg.value >= computed fee. Excess is refunded best-effort.
+     * @param cotiOracleTimestamp COTI `lastUpdated` from the latest `estimateDepositFee` (must still equal on-chain at execution).
+     * @param tokenOracleTimestamp Token `lastUpdated` from the same estimate (must still equal on-chain at execution).
+     * @dev Native COTI fee: send msg.value >= computed fee. Excess is refunded best-effort. If the Band row advances
+     *      before inclusion, tx reverts with {OracleTimestampMismatch}—re-estimate and resubmit (see {_validateOracleTimestamps}).
      */
     function deposit(
         uint256 amount,
@@ -219,10 +223,11 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
     /**
      * @notice Withdraw public ERC20 tokens by burning private tokens
      * @param amount Amount of private tokens to burn
-     * @param cotiOracleTimestamp COTI `lastUpdated` from estimate (must equal on-chain at execution; COTI UI avoids submit near refresh).
-     * @param tokenOracleTimestamp Token `lastUpdated` from estimate (must equal on-chain at execution).
+     * @param cotiOracleTimestamp COTI `lastUpdated` from the latest `estimateWithdrawFee` (must still equal on-chain at execution).
+     * @param tokenOracleTimestamp Token `lastUpdated` from the same estimate (must still equal on-chain at execution).
      * @dev Requires prior approval on the private token. Send `msg.value >= fee`; native fee is
-     *      collected only after the public token transfer succeeds (mirrors {deposit} ordering).
+     *      collected only after the public token transfer succeeds (mirrors {deposit} ordering). Oracle
+     *      timestamp rules match {deposit} / {_validateOracleTimestamps}.
      */
     function withdraw(
         uint256 amount,

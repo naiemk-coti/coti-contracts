@@ -415,14 +415,18 @@ abstract contract PrivacyBridge is ReentrancyGuard, Pausable, Ownable, AccessCon
 
     /**
      * @notice Validate oracle timestamps for both COTI and a bridged token.
-     * @dev Requires `lastUpdated == expected*` so execution uses the same oracle row the user saw when
-     *      quoting (otherwise a refresh between estimate and inclusion could change price without the user
-     *      having agreed to it on-screen). Production oracle cadence is ~30 minutes; the COTI UI blocks
-     *      submission for ~10 seconds before a scheduled refresh to reduce races inside that window.
-     *      Third-party integrators should mirror that pattern. {_requireOracleFreshness} still caps row age.
-     * @param expectedCotiTimestamp COTI `lastUpdated` from the user's estimate (must match on-chain).
-     * @param expectedTokenTimestamp Token `lastUpdated` from the user's estimate (must match on-chain).
-     * @param tokenSymbol The Band oracle symbol for the bridged token.
+     * @dev Strict equality: on-chain `lastUpdated` for COTI and for `tokenSymbol` must exactly equal the
+     *      `expected*` values supplied by the client. That binds execution to the same Band row the user
+     *      saw when calling the estimate view; if the feed publishes a newer row before inclusion, the check
+     *      reverts with {OracleTimestampMismatch} so price cannot change under the user without a visible revert.
+     *      Failures are timing/race issues (mempool delay vs oracle refresh cadence, often ~30 minutes), not
+     *      third-party griefing. Integrators: call estimate immediately before building the tx; pass returned
+     *      timestamps unchanged into deposit/withdraw; on mismatch, re-estimate and resubmit; avoid submit
+     *      across a refresh boundary (COTI UI blocks ~10s before a scheduled tick—mirror that); simulate right
+     *      before broadcast. {_requireOracleFreshness} still enforces {maxOracleAge} on the matched row.
+     * @param expectedCotiTimestamp COTI `lastUpdated` from the user's latest estimate (must equal on-chain).
+     * @param expectedTokenTimestamp Token `lastUpdated` from the user's latest estimate (must equal on-chain).
+     * @param tokenSymbol The Band oracle symbol for the bridged token (native bridge uses `"COTI"` for both).
      */
     function _validateOracleTimestamps(
         uint256 expectedCotiTimestamp,

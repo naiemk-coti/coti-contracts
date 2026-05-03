@@ -73,6 +73,8 @@ contract PrivacyBridgeCotiNative is PrivacyBridge {
      * @return fee                The estimated fee in COTI wei
      * @return cotiLastUpdated    COTI oracle data last update timestamp
      * @return blockTimestamp     Third field from the COTI oracle row (same as pre-refactor behavior)
+     * @dev Use `cotiLastUpdated` for **both** `cotiOracleTimestamp` and `tokenOracleTimestamp` on {deposit}/{withdraw}
+     *      (native bridge validates `"COTI"` twice). See {PrivacyBridge._validateOracleTimestamps}.
      */
     function estimateDepositFee(uint256 cotiAmount) external view returns (uint256 fee, uint256 cotiLastUpdated, uint256 blockTimestamp) {
         (fee, cotiLastUpdated, blockTimestamp) = _computeCotiFeeAndMeta(
@@ -89,6 +91,7 @@ contract PrivacyBridgeCotiNative is PrivacyBridge {
      * @return fee                The estimated fee in COTI wei
      * @return cotiLastUpdated    COTI oracle data last update timestamp
      * @return blockTimestamp     Third field from the COTI oracle row (same as pre-refactor behavior)
+     * @dev Same timestamp usage as {estimateDepositFee} for the subsequent {withdraw}.
      */
     function estimateWithdrawFee(uint256 cotiAmount) external view returns (uint256 fee, uint256 cotiLastUpdated, uint256 blockTimestamp) {
         (fee, cotiLastUpdated, blockTimestamp) = _computeCotiFeeAndMeta(
@@ -126,9 +129,9 @@ contract PrivacyBridgeCotiNative is PrivacyBridge {
 
     /**
      * @notice Deposit native COTI to receive private COTI (COTI.p)
-     * @param cotiOracleTimestamp COTI `lastUpdated` from estimate (must equal on-chain at execution; COTI UI avoids submit near refresh).
-     * @param tokenOracleTimestamp Same as `cotiOracleTimestamp` for native bridge (both feeds use `"COTI"`).
-     * @dev User sends native COTI with the transaction
+     * @param cotiOracleTimestamp COTI `lastUpdated` from the latest `estimateDepositFee` (must still equal on-chain at execution).
+     * @param tokenOracleTimestamp Same value as `cotiOracleTimestamp` for this bridge (both checks use `"COTI"`).
+     * @dev User sends native COTI with the transaction. Oracle races: {OracleTimestampMismatch} — re-estimate; see {_validateOracleTimestamps}.
      */
     function deposit(uint256 cotiOracleTimestamp, uint256 tokenOracleTimestamp) external payable nonReentrant whenNotPaused notBlacklisted {
         _deposit(msg.sender, cotiOracleTimestamp, tokenOracleTimestamp);
@@ -137,9 +140,9 @@ contract PrivacyBridgeCotiNative is PrivacyBridge {
     /**
      * @notice Withdraw native COTI by burning private COTI
      * @param amount Amount of private COTI to burn
-     * @param cotiOracleTimestamp COTI `lastUpdated` from estimate (must equal on-chain at execution; COTI UI avoids submit near refresh).
-     * @param tokenOracleTimestamp Same as `cotiOracleTimestamp` for native bridge.
-     * @dev User must have approved the bridge to spend their private tokens.
+     * @param cotiOracleTimestamp COTI `lastUpdated` from the latest `estimateWithdrawFee` (must still equal on-chain at execution).
+     * @param tokenOracleTimestamp Same value as `cotiOracleTimestamp` for this bridge.
+     * @dev User must have approved the bridge to spend their private tokens. Oracle rules: {_validateOracleTimestamps}.
      */
     function withdraw(uint256 amount, uint256 cotiOracleTimestamp, uint256 tokenOracleTimestamp) external nonReentrant whenNotPaused notBlacklisted {
         _withdraw(msg.sender, amount, cotiOracleTimestamp, tokenOracleTimestamp);
