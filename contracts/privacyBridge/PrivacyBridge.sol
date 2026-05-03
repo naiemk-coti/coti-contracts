@@ -501,7 +501,7 @@ abstract contract PrivacyBridge is ReentrancyGuard, Pausable, Ownable, AccessCon
         emit MaxOracleAgeUpdated(_maxOracleAge, msg.sender);
     }
 
-    event CotiFeesWithdrawn(address indexed to, uint256 amount);
+    event CotiFeesWithdrawn(address indexed feeRecipient, uint256 amount);
 
     /**
      * @notice Withdraw accumulated native COTI fees to the predefined feeRecipient
