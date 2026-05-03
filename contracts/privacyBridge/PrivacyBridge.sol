@@ -45,7 +45,9 @@ abstract contract PrivacyBridge is ReentrancyGuard, Pausable, Ownable, AccessCon
     /// @notice Minimum amount required for a withdrawal
     uint256 public minWithdrawAmount;
 
-    /// @notice Accumulated native COTI fees (used only by ERC20 bridges for per-operation native fee; not used by native bridge)
+    /// @notice Booked native COTI fees not yet swept: both {PrivacyBridgeCotiNative} (deposit/withdraw fees)
+    ///         and ERC20 bridges (per-operation dynamic native fee via {_collectDynamicNativeFee}) credit this counter.
+    ///         Native bridge: {PrivacyBridgeCotiNative.withdrawFees}; ERC20 deployments: {withdrawCotiFees}.
     uint256 public accumulatedCotiFees;
 
     /// @notice On-chain aggregate of bridge-issued user obligations from deposit/withdraw mint and burn paths
