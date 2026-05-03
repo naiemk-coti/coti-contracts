@@ -33,20 +33,36 @@ contract PrivacyBridgeCotiNative is PrivacyBridge {
      * @param maxFee The maximum fee cap in COTI wei
      * @return The computed fee in COTI wei
      */
+    /**
+     * @dev Single path for native COTI fee math + one oracle read. Used by {_computeCotiFee} and
+     *      {estimateDepositFee}/{estimateWithdrawFee} to avoid redundant reads.
+     */
+    function _computeCotiFeeAndMeta(
+        uint256 cotiAmount,
+        uint256 fixedFee,
+        uint256 percentageBps,
+        uint256 maxFee
+    ) internal view returns (uint256 fee, uint256 cotiLastUpdated, uint256 blockTimestamp) {
+        _requirePriceOracle();
+        (uint256 cotiUsdRate, uint256 cotiLU, uint256 cotiBts) = ICotiPriceConsumer(priceOracle).getPriceWithMeta("COTI");
+        _requirePositiveOracleRate(cotiUsdRate);
+        _requireOracleFreshness(cotiLU);
+        uint256 txValueUsd = Math.mulDiv(cotiAmount, cotiUsdRate, 1e18);
+        uint256 percentageFeeUsd = Math.mulDiv(txValueUsd, percentageBps, FEE_DIVISOR);
+        uint256 percentageFeeCoti = Math.mulDiv(percentageFeeUsd, 1e18, cotiUsdRate);
+        fee = _calculateDynamicFee(percentageFeeCoti, fixedFee, maxFee);
+        cotiLastUpdated = cotiLU;
+        blockTimestamp = cotiBts;
+    }
+
     function _computeCotiFee(
         uint256 cotiAmount,
         uint256 fixedFee,
         uint256 percentageBps,
         uint256 maxFee
     ) internal view returns (uint256) {
-        _requirePriceOracle();
-        (uint256 cotiUsdRate, uint256 cotiLastUpdated,) = ICotiPriceConsumer(priceOracle).getPriceWithMeta("COTI");
-        _requirePositiveOracleRate(cotiUsdRate);
-        _requireOracleFreshness(cotiLastUpdated);
-        uint256 txValueUsd = Math.mulDiv(cotiAmount, cotiUsdRate, 1e18);
-        uint256 percentageFeeUsd = Math.mulDiv(txValueUsd, percentageBps, FEE_DIVISOR);
-        uint256 percentageFeeCoti = Math.mulDiv(percentageFeeUsd, 1e18, cotiUsdRate);
-        return _calculateDynamicFee(percentageFeeCoti, fixedFee, maxFee);
+        (uint256 f,,) = _computeCotiFeeAndMeta(cotiAmount, fixedFee, percentageBps, maxFee);
+        return f;
     }
 
     /**
@@ -57,8 +73,12 @@ contract PrivacyBridgeCotiNative is PrivacyBridge {
      * @return blockTimestamp     Current block.timestamp
      */
     function estimateDepositFee(uint256 cotiAmount) external view returns (uint256 fee, uint256 cotiLastUpdated, uint256 blockTimestamp) {
-        fee = _computeCotiFee(cotiAmount, depositFixedFee, depositPercentageBps, depositMaxFee);
-        (,cotiLastUpdated, blockTimestamp) = ICotiPriceConsumer(priceOracle).getPriceWithMeta("COTI");
+        (fee, cotiLastUpdated, blockTimestamp) = _computeCotiFeeAndMeta(
+            cotiAmount,
+            depositFixedFee,
+            depositPercentageBps,
+            depositMaxFee
+        );
     }
 
     /**
@@ -69,8 +89,12 @@ contract PrivacyBridgeCotiNative is PrivacyBridge {
      * @return blockTimestamp     Current block.timestamp
      */
     function estimateWithdrawFee(uint256 cotiAmount) external view returns (uint256 fee, uint256 cotiLastUpdated, uint256 blockTimestamp) {
-        fee = _computeCotiFee(cotiAmount, withdrawFixedFee, withdrawPercentageBps, withdrawMaxFee);
-        (,cotiLastUpdated, blockTimestamp) = ICotiPriceConsumer(priceOracle).getPriceWithMeta("COTI");
+        (fee, cotiLastUpdated, blockTimestamp) = _computeCotiFeeAndMeta(
+            cotiAmount,
+            withdrawFixedFee,
+            withdrawPercentageBps,
+            withdrawMaxFee
+        );
     }
 
     /**

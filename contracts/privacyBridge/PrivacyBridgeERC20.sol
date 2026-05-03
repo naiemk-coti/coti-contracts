@@ -61,24 +61,45 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
      * @param maxFee The maximum fee cap in COTI
      * @return The computed fee in native COTI (18 decimals)
      */
+    /**
+     * @dev Single path for ERC20 fee math + oracle reads (two getPriceWithMeta calls). Used by
+     *      {_computeErc20Fee} and {estimateDepositFee}/{estimateWithdrawFee} to avoid redundant reads.
+     */
+    function _computeErc20FeeAndMeta(
+        uint256 tokenAmount,
+        uint256 fixedFee,
+        uint256 percentageBps,
+        uint256 maxFee
+    )
+        internal
+        view
+        returns (uint256 fee, uint256 cotiLastUpdated, uint256 tokenLastUpdated, uint256 blockTimestamp)
+    {
+        _requirePriceOracle();
+        ICotiPriceConsumer oracle = ICotiPriceConsumer(priceOracle);
+        (uint256 tokenUsdRate, uint256 tokenLU,) = oracle.getPriceWithMeta(tokenSymbol);
+        (uint256 cotiUsdRate, uint256 cotiLU, uint256 cotiBts) = oracle.getPriceWithMeta("COTI");
+        _requirePositiveOracleRate(tokenUsdRate);
+        _requirePositiveOracleRate(cotiUsdRate);
+        _requireOracleFreshness(tokenLU);
+        _requireOracleFreshness(cotiLU);
+        uint256 txValueUsd = Math.mulDiv(tokenAmount, tokenUsdRate, 10 ** uint256(bridgedTokenDecimals));
+        uint256 percentageFeeUsd = Math.mulDiv(txValueUsd, percentageBps, FEE_DIVISOR);
+        uint256 percentageFeeCoti = Math.mulDiv(percentageFeeUsd, 1e18, cotiUsdRate);
+        fee = _calculateDynamicFee(percentageFeeCoti, fixedFee, maxFee);
+        cotiLastUpdated = cotiLU;
+        tokenLastUpdated = tokenLU;
+        blockTimestamp = cotiBts;
+    }
+
     function _computeErc20Fee(
         uint256 tokenAmount,
         uint256 fixedFee,
         uint256 percentageBps,
         uint256 maxFee
     ) internal view returns (uint256) {
-        _requirePriceOracle();
-        ICotiPriceConsumer oracle = ICotiPriceConsumer(priceOracle);
-        (uint256 tokenUsdRate, uint256 tokenLastUpdated,) = oracle.getPriceWithMeta(tokenSymbol);
-        (uint256 cotiUsdRate, uint256 cotiLastUpdated,) = oracle.getPriceWithMeta("COTI");
-        _requirePositiveOracleRate(tokenUsdRate);
-        _requirePositiveOracleRate(cotiUsdRate);
-        _requireOracleFreshness(tokenLastUpdated);
-        _requireOracleFreshness(cotiLastUpdated);
-        uint256 txValueUsd = Math.mulDiv(tokenAmount, tokenUsdRate, 10 ** uint256(bridgedTokenDecimals));
-        uint256 percentageFeeUsd = Math.mulDiv(txValueUsd, percentageBps, FEE_DIVISOR);
-        uint256 percentageFeeCoti = Math.mulDiv(percentageFeeUsd, 1e18, cotiUsdRate);
-        return _calculateDynamicFee(percentageFeeCoti, fixedFee, maxFee);
+        (uint256 f,,,) = _computeErc20FeeAndMeta(tokenAmount, fixedFee, percentageBps, maxFee);
+        return f;
     }
 
     /**
@@ -90,9 +111,12 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
      * @return blockTimestamp     Current block.timestamp
      */
     function estimateDepositFee(uint256 tokenAmount) external view returns (uint256 fee, uint256 cotiLastUpdated, uint256 tokenLastUpdated, uint256 blockTimestamp) {
-        fee = _computeErc20Fee(tokenAmount, depositFixedFee, depositPercentageBps, depositMaxFee);
-        (,cotiLastUpdated, blockTimestamp) = ICotiPriceConsumer(priceOracle).getPriceWithMeta("COTI");
-        (,tokenLastUpdated,) = ICotiPriceConsumer(priceOracle).getPriceWithMeta(tokenSymbol);
+        (fee, cotiLastUpdated, tokenLastUpdated, blockTimestamp) = _computeErc20FeeAndMeta(
+            tokenAmount,
+            depositFixedFee,
+            depositPercentageBps,
+            depositMaxFee
+        );
     }
 
     /**
@@ -104,9 +128,12 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
      * @return blockTimestamp     Current block.timestamp
      */
     function estimateWithdrawFee(uint256 tokenAmount) external view returns (uint256 fee, uint256 cotiLastUpdated, uint256 tokenLastUpdated, uint256 blockTimestamp) {
-        fee = _computeErc20Fee(tokenAmount, withdrawFixedFee, withdrawPercentageBps, withdrawMaxFee);
-        (,cotiLastUpdated, blockTimestamp) = ICotiPriceConsumer(priceOracle).getPriceWithMeta("COTI");
-        (,tokenLastUpdated,) = ICotiPriceConsumer(priceOracle).getPriceWithMeta(tokenSymbol);
+        (fee, cotiLastUpdated, tokenLastUpdated, blockTimestamp) = _computeErc20FeeAndMeta(
+            tokenAmount,
+            withdrawFixedFee,
+            withdrawPercentageBps,
+            withdrawMaxFee
+        );
     }
 
     /**
