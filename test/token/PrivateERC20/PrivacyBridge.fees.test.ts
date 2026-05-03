@@ -75,8 +75,6 @@ describe("PrivacyBridge Fees (dynamic native COTI)", function () {
         await bridge.waitForDeployment()
         bridgeAddress = await bridge.getAddress()
 
-        await (await bridge.setMaxOracleAge(0)).wait()
-
         await publicToken.connect(owner).transfer(bridgeAddress, INITIAL_SUPPLY / 2n, { gasLimit: GAS_LIMIT })
 
         await owner.sendTransaction({ to: user.address, value: parseEther("50") })
@@ -109,6 +107,13 @@ describe("PrivacyBridge Fees (dynamic native COTI)", function () {
                         txOpts
                     )
             ).to.be.revertedWithCustomError(bridge, "InvalidAddress")
+        })
+
+        it("reverts setMaxOracleAge(0)", async function () {
+            await expect(bridge.connect(owner).setMaxOracleAge(0n, { gasLimit: GAS_LIMIT })).to.be.revertedWithCustomError(
+                bridge,
+                "OracleMaxAgeZeroDisallowed"
+            )
         })
 
         it("estimateDepositFee returns fee and timestamps", async function () {

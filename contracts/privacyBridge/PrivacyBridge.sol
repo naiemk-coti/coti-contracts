@@ -20,7 +20,8 @@ import "../oracle/ICotiPriceConsumer.sol";
  *          owner key compromise after pause as catastrophic TVL loss to {rescueRecipient}. Mitigations are
  *          operational: multisig or timelock on ownership, strict {rescueRecipient} policy, monitoring of
  *          {Paused} and rescue events, and separation of duties where possible.
- *      (4) Oracle prices are trusted; {maxOracleAge} bounds staleness of `lastUpdated` when set (does not remove oracle trust).
+ *      (4) Oracle prices are trusted; {maxOracleAge} bounds staleness of `lastUpdated` (owner cannot set it to zero;
+ *          use a large value only if a very lenient window is intended). Does not remove oracle trust.
  *      (5) {totalUserLiability} is bridge bookkeeping for transparency: it tracks net user obligations from mint/burn
  *          paths in this contract. It helps depositors/observers reason about exposure on-chain; it is not a
  *          cryptographic proof of MPC/private-token balances and can diverge if the token layer misbehaves.
@@ -106,7 +107,8 @@ abstract contract PrivacyBridge is ReentrancyGuard, Pausable, Ownable, AccessCon
     ///         updates or inclusion lag do not spuriously revert with {OraclePriceStale}.
     uint256 public constant DEFAULT_MAX_ORACLE_AGE = 30 minutes + 5 minutes;
 
-    /// @notice Maximum allowed `block.timestamp - oracle lastUpdated` (seconds). Initialized to {DEFAULT_MAX_ORACLE_AGE}; set to 0 to disable.
+    /// @notice Maximum allowed `block.timestamp - oracle lastUpdated` (seconds). Initialized to {DEFAULT_MAX_ORACLE_AGE};
+    ///         owner may increase the window (e.g. for long test runs) but {setMaxOracleAge} rejects zero.
     uint256 public maxOracleAge;
 
     /// @notice Address where collected fees are sent
@@ -127,6 +129,7 @@ abstract contract PrivacyBridge is ReentrancyGuard, Pausable, Ownable, AccessCon
     error InvalidOraclePrice();
     error OraclePriceStale(uint256 oracleLastUpdated, uint256 blockTimestamp, uint256 maxOracleAge);
     error OracleLastUpdatedInFuture(uint256 lastUpdated);
+    error OracleMaxAgeZeroDisallowed();
     error FeeRecipientNotSet();
     error AddressBlacklisted(address account);
 
@@ -400,12 +403,11 @@ abstract contract PrivacyBridge is ReentrancyGuard, Pausable, Ownable, AccessCon
     }
 
     /**
-     * @notice Reject oracle rows that are too old vs `block.timestamp` when {maxOracleAge} is set.
-     * @dev `maxOracleAge == 0` disables this check (e.g. for tests). Default is {DEFAULT_MAX_ORACLE_AGE} from the constructor.
+     * @notice Reject oracle rows that are too old vs `block.timestamp` per {maxOracleAge}.
+     * @dev {maxOracleAge} is always non-zero in normal configuration ({setMaxOracleAge} forbids zero).
      */
     function _requireOracleFreshness(uint256 lastUpdated) internal view {
         uint256 maxAge = maxOracleAge;
-        if (maxAge == 0) return;
         if (lastUpdated > block.timestamp) revert OracleLastUpdatedInFuture(lastUpdated);
         uint256 nowTs = block.timestamp;
         if (nowTs - lastUpdated > maxAge) revert OraclePriceStale(lastUpdated, nowTs, maxAge);
@@ -515,9 +517,12 @@ abstract contract PrivacyBridge is ReentrancyGuard, Pausable, Ownable, AccessCon
 
     /**
      * @notice Set the maximum allowed age of oracle `lastUpdated` (seconds) relative to `block.timestamp`.
-     * @param _maxOracleAge Use 0 to disable staleness checks; default after deploy is {DEFAULT_MAX_ORACLE_AGE} (30 min cadence + 5 min buffer).
+     * @param _maxOracleAge Must be non-zero. Default after deploy is {DEFAULT_MAX_ORACLE_AGE} (30 min cadence + 5 min buffer).
+     * @dev Zero is rejected so production cannot accidentally turn off staleness bounds; for very lenient test
+     *      environments use a large finite value instead.
      */
     function setMaxOracleAge(uint256 _maxOracleAge) external onlyOwner {
+        if (_maxOracleAge == 0) revert OracleMaxAgeZeroDisallowed();
         maxOracleAge = _maxOracleAge;
         emit MaxOracleAgeUpdated(_maxOracleAge, msg.sender);
     }
