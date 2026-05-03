@@ -45,14 +45,6 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
     error DecimalsMismatch();
     event ERC20Rescued(address indexed token, address indexed to, uint256 amount);
 
-    /// @dev Rescuing the live public bridged `token` uses the same pause gate as {PrivacyBridgeCotiNative.rescueNative}.
-    modifier whenBridgedTokenRescue(address _token) {
-        if (_token == address(token)) {
-            _requirePaused();
-        }
-        _;
-    }
-
     /**
      * @dev ERC20 fee math + two {getPriceWithMeta} reads (token then COTI). Used by {_computeErc20Fee}
      *      and {estimateDepositFee}/{estimateWithdrawFee}. Extreme `tokenAmount`×`tokenUsdRate` values
@@ -257,17 +249,14 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
     }
 
     /**
-     * @dev Rescue ERC20 tokens sent to the contract (excluding private tokens).
-     *      Sends to the predefined rescueRecipient address.
-     *      For the live public bridged `token`, the bridge must be {paused} first: this is the
-     *      emergency gate to move **all** bridged liquidity (including TVL backing users) to a new
-     *      deployment after a bug, alongside operational controls on {pause} and ownership.
-     *      Other ERC20s can still be rescued while unpaused (airdrops / mistaken sends).
+     * @dev Rescue ERC20 tokens sent to the contract (excluding private tokens) to {rescueRecipient}.
+     *      The bridge must be {paused} for **any** rescued token (live bridged token, airdrops, or
+     *      mistaken sends) so owner rescue cannot run alongside live deposits/withdrawals.
      */
     function rescueERC20(
         address _token,
         uint256 amount
-    ) external onlyOwner nonReentrant whenBridgedTokenRescue(_token) {
+    ) external onlyOwner nonReentrant whenPaused {
         if (amount == 0) revert AmountZero();
 
         if (_token == address(privateToken)) revert CannotRescueBridgeToken();
