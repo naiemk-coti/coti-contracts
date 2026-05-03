@@ -279,7 +279,10 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
      *      For the live public {token}, `amount` can be the full balance—including all TVL backing withdrawals.
      *      Same governance risk as {PrivacyBridgeCotiNative.rescueNative}: owner + pause can send user funds
      *      to {rescueRecipient}; see {PrivacyBridge} contract @dev (3). Private token cannot be rescued here
-     *      ({CannotRescueBridgeToken}).
+     *      ({CannotRescueBridgeToken}). {totalUserLiability} is intentionally **not** updated here: rescue only
+     *      moves collateral to {rescueRecipient}; it does not burn private tokens or unwind user obligations on
+     *      this ledger, so outstanding claims can exceed {token} held by this contract until a separate migration
+     *      path makes users whole.
      */
     function rescueERC20(
         address _token,

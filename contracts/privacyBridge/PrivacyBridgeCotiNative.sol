@@ -262,7 +262,10 @@ contract PrivacyBridgeCotiNative is PrivacyBridge {
      *      or handover to a new bridge; a malicious or compromised owner who has paused can drain TVL to
      *      {rescueRecipient} in one or more calls. See {PrivacyBridge} contract-level @dev (3) for governance
      *      mitigations (multisig, timelock, monitoring). After a partial rescue, {accumulatedCotiFees} is capped
-     *      to the remaining balance so fee accounting cannot exceed what is still on the contract.
+     *      to the remaining balance so fee accounting cannot exceed what is still on the contract. {totalUserLiability}
+     *      is **not** adjusted: rescue only moves native to {rescueRecipient}; it does not burn private tokens or
+     *      reduce user obligations on this contract, so the counter may exceed {address(this).balance} until a
+     *      separate migration makes users whole.
      * @param amount Amount of native currency to send (often the full balance for migration).
      */
     function rescueNative(uint256 amount) external onlyOwner nonReentrant whenPaused {
