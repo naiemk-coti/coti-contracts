@@ -54,16 +54,9 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
     }
 
     /**
-     * @notice Compute the dynamic fee in COTI for an ERC20 bridge operation
-     * @param tokenAmount The amount of ERC20 tokens being bridged
-     * @param fixedFee The minimum fee floor in COTI
-     * @param percentageBps The percentage in basis points (relative to FEE_DIVISOR)
-     * @param maxFee The maximum fee cap in COTI
-     * @return The computed fee in native COTI (18 decimals)
-     */
-    /**
-     * @dev Single path for ERC20 fee math + oracle reads (two getPriceWithMeta calls). Used by
-     *      {_computeErc20Fee} and {estimateDepositFee}/{estimateWithdrawFee} to avoid redundant reads.
+     * @dev ERC20 fee math + two {getPriceWithMeta} reads (token then COTI). Used by {_computeErc20Fee}
+     *      and {estimateDepositFee}/{estimateWithdrawFee}. Extreme `tokenAmount`×`tokenUsdRate` values
+     *      can make {Math.mulDiv} revert—keep amounts within configured max deposit/withdraw limits.
      */
     function _computeErc20FeeAndMeta(
         uint256 tokenAmount,
@@ -104,11 +97,11 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
 
     /**
      * @notice Estimate the deposit fee in COTI for a given token amount
-     * @param tokenAmount The amount of ERC20 tokens to deposit
+     * @param tokenAmount The amount of ERC20 tokens to deposit (raw token units; very large values can revert in fee math)
      * @return fee                The estimated fee in native COTI (18 decimals)
      * @return cotiLastUpdated    COTI oracle data last update timestamp
      * @return tokenLastUpdated   Token oracle data last update timestamp
-     * @return blockTimestamp     Current block.timestamp
+     * @return blockTimestamp     Third field from the COTI oracle row (same as pre-refactor behavior)
      */
     function estimateDepositFee(uint256 tokenAmount) external view returns (uint256 fee, uint256 cotiLastUpdated, uint256 tokenLastUpdated, uint256 blockTimestamp) {
         (fee, cotiLastUpdated, tokenLastUpdated, blockTimestamp) = _computeErc20FeeAndMeta(
@@ -121,11 +114,11 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
 
     /**
      * @notice Estimate the withdrawal fee in COTI for a given token amount
-     * @param tokenAmount The amount of ERC20 tokens to withdraw
+     * @param tokenAmount The amount of ERC20 tokens to withdraw (raw units; very large values can revert in fee math)
      * @return fee                The estimated fee in native COTI (18 decimals)
      * @return cotiLastUpdated    COTI oracle data last update timestamp
      * @return tokenLastUpdated   Token oracle data last update timestamp
-     * @return blockTimestamp     Current block.timestamp
+     * @return blockTimestamp     Third field from the COTI oracle row (same as pre-refactor behavior)
      */
     function estimateWithdrawFee(uint256 tokenAmount) external view returns (uint256 fee, uint256 cotiLastUpdated, uint256 tokenLastUpdated, uint256 blockTimestamp) {
         (fee, cotiLastUpdated, tokenLastUpdated, blockTimestamp) = _computeErc20FeeAndMeta(

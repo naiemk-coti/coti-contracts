@@ -56,7 +56,9 @@ abstract contract PrivacyBridge is ReentrancyGuard, Pausable, Ownable, AccessCon
     ///         in its own accounting. This does not attest to MPC correctness or encrypted token balances.
     uint256 public totalUserLiability;
 
-    /// @notice Fee divisor (1,000,000)
+    /// @notice Fee divisor (1,000,000). Fee math uses {Math.mulDiv}; pathological combinations of
+    ///         amount × oracle rate can still cause reverts (panic) on overflow—operators should set
+    ///         deposit/withdraw limits accordingly.
     uint256 public constant FEE_DIVISOR = 1000000;
 
     /// @notice Maximum fee allowed (10% = 100,000 units)

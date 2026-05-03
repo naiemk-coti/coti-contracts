@@ -34,8 +34,9 @@ contract PrivacyBridgeCotiNative is PrivacyBridge {
      * @return The computed fee in COTI wei
      */
     /**
-     * @dev Single path for native COTI fee math + one oracle read. Used by {_computeCotiFee} and
-     *      {estimateDepositFee}/{estimateWithdrawFee} to avoid redundant reads.
+     * @dev Native COTI fee math + one {getPriceWithMeta("COTI")} read. Used by {_computeCotiFee} and
+     *      {estimateDepositFee}/{estimateWithdrawFee}. Extreme `cotiAmount`×`cotiUsdRate` values can make
+     *      {Math.mulDiv} revert—keep amounts within configured max deposit/withdraw limits.
      */
     function _computeCotiFeeAndMeta(
         uint256 cotiAmount,
@@ -67,10 +68,10 @@ contract PrivacyBridgeCotiNative is PrivacyBridge {
 
     /**
      * @notice Estimate the deposit fee in COTI for a given COTI amount
-     * @param cotiAmount The amount of native COTI to deposit
+     * @param cotiAmount The amount of native COTI to deposit (wei; very large values can revert in fee math)
      * @return fee                The estimated fee in COTI wei
      * @return cotiLastUpdated    COTI oracle data last update timestamp
-     * @return blockTimestamp     Current block.timestamp
+     * @return blockTimestamp     Third field from the COTI oracle row (same as pre-refactor behavior)
      */
     function estimateDepositFee(uint256 cotiAmount) external view returns (uint256 fee, uint256 cotiLastUpdated, uint256 blockTimestamp) {
         (fee, cotiLastUpdated, blockTimestamp) = _computeCotiFeeAndMeta(
@@ -83,10 +84,10 @@ contract PrivacyBridgeCotiNative is PrivacyBridge {
 
     /**
      * @notice Estimate the withdrawal fee in COTI for a given COTI amount
-     * @param cotiAmount The amount of native COTI to withdraw
+     * @param cotiAmount The amount of native COTI to withdraw (wei; very large values can revert in fee math)
      * @return fee                The estimated fee in COTI wei
      * @return cotiLastUpdated    COTI oracle data last update timestamp
-     * @return blockTimestamp     Current block.timestamp
+     * @return blockTimestamp     Third field from the COTI oracle row (same as pre-refactor behavior)
      */
     function estimateWithdrawFee(uint256 cotiAmount) external view returns (uint256 fee, uint256 cotiLastUpdated, uint256 blockTimestamp) {
         (fee, cotiLastUpdated, blockTimestamp) = _computeCotiFeeAndMeta(
