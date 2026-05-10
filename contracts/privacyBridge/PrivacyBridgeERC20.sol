@@ -96,8 +96,8 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
         uint256 tokenAmount,
         uint256 fixedFee,
         uint256 percentageBps,
-        uint256 maxFee
-        string tokenSymbol
+        uint256 maxFee,
+        string memory oracleTokenSymbol,
         uint8 tokenDecimals
     )
         internal
@@ -106,7 +106,7 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
     {
         _requirePriceOracle();
         ICotiPriceConsumer oracle = ICotiPriceConsumer(priceOracle);
-        (uint256 tokenUsdRate, uint256 tokenLU,) = oracle.getPriceWithMeta(tokenSymbol);
+        (uint256 tokenUsdRate, uint256 tokenLU,) = oracle.getPriceWithMeta(oracleTokenSymbol);
         (uint256 cotiUsdRate, uint256 cotiLU, uint256 cotiBts) = oracle.getPriceWithMeta("COTI");
         _requirePositiveOracleRate(tokenUsdRate);
         _requirePositiveOracleRate(cotiUsdRate);
@@ -119,16 +119,6 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
         cotiLastUpdated = cotiLU;
         tokenLastUpdated = tokenLU;
         blockTimestamp = cotiBts;
-    }
-
-    function _computeErc20Fee(
-        uint256 tokenAmount,
-        uint256 fixedFee,
-        uint256 percentageBps,
-        uint256 maxFee
-    ) internal view returns (uint256) {
-        (uint256 f,,,) = _computeErc20FeeAndMeta(tokenAmount, fixedFee, percentageBps, maxFee);
-        return f;
     }
 
     /**
@@ -146,7 +136,9 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
             tokenAmount,
             depositFixedFee,
             depositPercentageBps,
-            depositMaxFee
+            depositMaxFee,
+            tokenSymbol,
+            bridgedTokenDecimals
         );
     }
 
@@ -164,7 +156,9 @@ abstract contract PrivacyBridgeERC20 is PrivacyBridge {
             tokenAmount,
             withdrawFixedFee,
             withdrawPercentageBps,
-            withdrawMaxFee
+            withdrawMaxFee,
+            tokenSymbol,
+            bridgedTokenDecimals
         );
     }
 
