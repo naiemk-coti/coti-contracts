@@ -76,8 +76,8 @@ const config: HardhatUserConfig = {
         network: "coti-mainnet",
         chainId: 2632500,
         urls: {
-          apiURL: "https://cotiscan.io/api",
-          browserURL: "https://cotiscan.io/",
+          apiURL: "https://mainnet.cotiscan.io/api",
+          browserURL: "https://mainnet.cotiscan.io/",
         },
       },
     ],
