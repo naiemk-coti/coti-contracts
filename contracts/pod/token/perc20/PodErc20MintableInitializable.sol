@@ -1,13 +1,18 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.20;
 
+import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "./PodErc20Mintable.sol";
 
 /// @title PodErc20MintableInitializable
-/// @notice Clone-friendly {PodErc20Mintable}; the implementation constructor only locks the implementation instance.
-contract PodErc20MintableInitializable is PodErc20Mintable {
+/// @notice Clone-friendly {PodErc20Mintable}; the implementation constructor locks the implementation instance.
+/// @dev Split deploy-then-initialize is unsafe: an attacker can front-run `initialize` on an uninitialized clone.
+///      Use {PrivacyPortalFactory.createPortal} or another single-transaction clone+init path.
+contract PodErc20MintableInitializable is PodErc20Mintable, Initializable {
     /// @notice Lock the implementation instance with placeholder values.
-    constructor() PodErc20Mintable(address(1), 1, address(1), address(1), "IMPLEMENTATION", "IMPL") {}
+    constructor() PodErc20Mintable(address(1), 1, address(1), address(1), "IMPLEMENTATION", "IMPL") {
+        _disableInitializers();
+    }
 
     /// @notice Initialize a mintable source-chain pToken clone.
     /// @param _minter Address allowed to mint.
@@ -25,7 +30,7 @@ contract PodErc20MintableInitializable is PodErc20Mintable {
         string memory _name,
         string memory _symbol,
         uint8 _decimals
-    ) external {
+    ) external initializer {
         _initializePodErc20Mintable(_minter, _cotiChainId, _inbox, _cotiSideContract, _name, _symbol, _decimals);
     }
 }

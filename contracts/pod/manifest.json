@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-06-25T12:37:39Z",
+  "generatedAt": "2026-06-28T23:14:27Z",
   "source": "/Users/ith/nk/pod-mpc-lib/contracts",
-  "target": "/Users/ith/nk/coti-contracts/pod",
+  "target": "/Users/ith/nk/coti-contracts/contracts/pod",
   "files": [
     "examples/it128/PodAdder128.sol",
     "examples/it256/PodAdder256.sol",

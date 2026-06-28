@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 import "../token/perc20/IPodERC20.sol";
 import "../token/erc7984/IERC7984PortalWrapper.sol";
@@ -23,7 +24,8 @@ interface IPrivacyPortalPauseController {
 /// @title PrivacyPortal
 /// @notice Locks a public ERC20 and mints/burns its PoD private pToken counterpart.
 /// @dev The portal never reads private balances. It only reacts to successful pToken callbacks and records public bridge obligations.
-contract PrivacyPortal is IPrivacyPortal, IERC7984PortalWrapper, Ownable, ReentrancyGuard {
+///      Split deploy-then-initialize is unsafe on clones; use {PrivacyPortalFactory.createPortal} or an equivalent atomic path.
+contract PrivacyPortal is IPrivacyPortal, IERC7984PortalWrapper, Ownable, ReentrancyGuard, Initializable {
     using SafeERC20 for IERC20;
 
     /// @notice Public ERC20 collateral locked by this portal.
@@ -87,8 +89,6 @@ contract PrivacyPortal is IPrivacyPortal, IERC7984PortalWrapper, Ownable, Reentr
     error WithdrawalNotPending(bytes32 withdrawalId, WithdrawalStatus status);
     /// @notice Requested burn cleanup exceeds accumulated debt.
     error BurnDebtTooLow(uint256 debt, uint256 requested);
-    /// @notice Clone was already initialized.
-    error PortalAlreadyInitialized();
     /// @notice Pause controller reports withdrawals are paused.
     error WithdrawalsPaused();
     /// @notice Pause controller reports deposits are paused.
@@ -103,7 +103,9 @@ contract PrivacyPortal is IPrivacyPortal, IERC7984PortalWrapper, Ownable, Reentr
     error NativeTransferFailed();
 
     /// @notice Lock implementation instance by assigning a non-zero owner placeholder.
-    constructor() Ownable(address(1)) {}
+    constructor() Ownable(address(1)) {
+        _disableInitializers();
+    }
 
     /// @notice Accept native funds used only for pToken burn-fee cleanup or accidental recovery.
     /// @dev User-facing deposit and withdrawal fees should be passed as `msg.value`; arbitrary native donations can be swept by the owner.
@@ -115,10 +117,7 @@ contract PrivacyPortal is IPrivacyPortal, IERC7984PortalWrapper, Ownable, Reentr
         address pToken_,
         uint8 decimals_,
         bool nativeWrappedUnderlying_
-    ) external override {
-        if (address(underlyingToken) != address(0)) {
-            revert PortalAlreadyInitialized();
-        }
+    ) external initializer override {
         if (owner_ == address(0)) {
             revert OwnableInvalidOwner(owner_);
         }

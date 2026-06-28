@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.20;
 
 /// @title IInbox
 /// @notice Cross-chain request/response inbox: send messages to remote chains, execute incoming calls, and query state.

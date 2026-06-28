@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.20;
 
 import "../../../utils/mpc/MpcCore.sol";
 
@@ -101,8 +101,8 @@ interface IPodERC20 {
     function balanceOf(address account) external view returns (ctUint256 memory);
 
     /**
-     * @notice Same as {balanceOf}, plus whether this account is currently locked by an in-flight transfer (or burn).
-     * @dev While `pending` is true, new transfers involving this address as `from` or `to` will revert.
+     * @notice Same as {balanceOf}, plus whether this account is locked by an in-flight outgoing transfer, burn, or mint (recipient).
+     * @dev While `pending` is true, new transfers or burns from this account (or mints to it) will revert.
      */
     function balanceOfWithStatus(address account) external view returns (ctUint256 memory, bool pending);
 
@@ -111,8 +111,8 @@ interface IPodERC20 {
     /**
      * @notice Starts an encrypted transfer of `value` from the caller to `to`.
      * @return requestId Inbox request id; completion is asynchronous via {Transfer} or {TransferFailed}.
-     * @dev **Gotcha:** reverts if either the sender or `to` already has a pending transfer. **Gotcha:** concurrent approvals use a
-     *      separate pending map and do not block transfers unless your deployment couples them elsewhere.
+     * @dev **Gotcha:** reverts if the sender already has a pending transfer or burn. Incoming transfers do not lock the recipient.
+     *      **Gotcha:** concurrent approvals use a separate pending map and do not block transfers unless your deployment couples them elsewhere.
      * @param callbackFeeLocalWei Caller-estimated wei slice for the callback leg; total payment is `msg.value`.
      */
     function transfer(address to, itUint256 calldata value, uint256 callbackFeeLocalWei) external payable returns (bytes32 requestId);

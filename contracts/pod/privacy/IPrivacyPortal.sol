@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.20;
 
 /// @title IPrivacyPortal
 /// @notice Source-chain portal interface for locking public ERC20 collateral and minting/burning private pTokens.

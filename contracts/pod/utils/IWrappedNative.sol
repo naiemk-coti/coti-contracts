@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.20;
 
 /// @notice Minimal WETH9 / WAVAX interface for wrap-on-deposit and unwrap-on-withdraw.
 interface IWrappedNative {

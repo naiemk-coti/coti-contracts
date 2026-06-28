@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.20;
 
 import "../../../../utils/mpc/MpcCore.sol";
 
@@ -69,12 +69,12 @@ interface IPodErc20CotiSide {
      * @notice Sets garbled allowance and `respond`s with owner- and spender-specific ciphertext of the same allowance amount.
      * @dev On invalid addresses the implementation should `raise` rather than revert if you need PoD `approveError` symmetry.
      */
-    function approve(address owner, address spender, gtUint256 value) external;
+    function approve(address tokenOwner, address spender, gtUint256 value) external;
 
     /**
      * @notice Plain-amount variant of {approve}; COTI garbles via `MpcCore.setPublic256`.
      */
-    function approvePublic(address owner, address spender, uint256 value) external;
+    function approvePublic(address tokenOwner, address spender, uint256 value) external;
 
     /**
      * @notice Subtracts `value` from `from` and responds with a burn-shaped tuple (`to == 0`, zero ciphertexts for receiver side).

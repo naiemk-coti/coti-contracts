@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
@@ -136,6 +136,8 @@ contract PrivacyPortalFactory is Ownable {
     }
 
     /// @notice Deploy a portal and pToken clone for an underlying token and register on the COTI mother ledger.
+    /// @dev Clone deployment and `initialize` run atomically in this transaction. Do not deploy a clone and call
+    ///      `initialize` in a separate transaction—an attacker can front-run initialization and seize the instance.
     /// @param underlying Public ERC20 collateral token.
     /// @param name Source pToken name.
     /// @param symbol Source pToken symbol.

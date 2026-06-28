@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.20;
 
 /// @title Erc7984Constants
 /// @notice Shared constants for ERC-7984 explorer compatibility.

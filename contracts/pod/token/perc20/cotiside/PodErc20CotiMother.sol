@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.20;
 
 import "../../../../utils/mpc/MpcCore.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -75,13 +75,13 @@ contract PodErc20CotiMother is IPodErc20CotiSide, InboxUser, Ownable {
     );
     event ApprovalCompleted(
         bytes32 indexed tokenId,
-        address indexed owner,
+        address indexed tokenOwner,
         address indexed spender,
         bool amountIsPublic,
         uint256 publicAmount
     );
     event TransferFailureRaised(bytes32 indexed tokenId, address indexed from, address indexed to, bytes reason);
-    event ApprovalFailureRaised(bytes32 indexed tokenId, address indexed owner, address indexed spender, bytes reason);
+    event ApprovalFailureRaised(bytes32 indexed tokenId, address indexed tokenOwner, address indexed spender, bytes reason);
     event SyncBalancesFailureRaised(bytes32 indexed tokenId, bytes reason);
 
     // --- Errors ---
@@ -267,20 +267,20 @@ contract PodErc20CotiMother is IPodErc20CotiSide, InboxUser, Ownable {
 
     /// @inheritdoc IPodErc20CotiSide
     function approve(
-        address owner,
+        address tokenOwner,
         address spender,
         gtUint256 value
     ) external override onlyRegisteredPTokenMessage {
-        _approveInternal(_activeTokenId(), owner, spender, value, false, 0);
+        _approveInternal(_activeTokenId(), tokenOwner, spender, value, false, 0);
     }
 
     /// @inheritdoc IPodErc20CotiSide
     function approvePublic(
-        address owner,
+        address tokenOwner,
         address spender,
         uint256 value
     ) external override onlyRegisteredPTokenMessage {
-        _approveInternal(_activeTokenId(), owner, spender, MpcCore.setPublic256(value), true, value);
+        _approveInternal(_activeTokenId(), tokenOwner, spender, MpcCore.setPublic256(value), true, value);
     }
 
     /// @inheritdoc IPodErc20CotiSide
@@ -426,8 +426,8 @@ contract PodErc20CotiMother is IPodErc20CotiSide, InboxUser, Ownable {
         _tokenNonce[id] = transferNonce + 1;
     }
 
-    function _readGarbledAllowance(bytes32 id, address owner, address spender) private returns (gtUint256) {
-        ctUint256 memory ct = _allowanceCiphertext[id][owner][spender];
+    function _readGarbledAllowance(bytes32 id, address tokenOwner, address spender) private returns (gtUint256) {
+        ctUint256 memory ct = _allowanceCiphertext[id][tokenOwner][spender];
         if (_isEmptyCtUint256(ct)) {
             return MpcCore.onBoard(_ciphertextPlainZero());
         }
@@ -451,23 +451,23 @@ contract PodErc20CotiMother is IPodErc20CotiSide, InboxUser, Ownable {
 
     function _approveInternal(
         bytes32 id,
-        address owner,
+        address tokenOwner,
         address spender,
         gtUint256 garbledAllowance,
         bool amountIsPublic,
         uint256 publicAmount
     ) private {
-        if (owner == address(0) || spender == address(0)) {
-            _sendApproveFailureToPod(id, owner, spender, bytes("PodErc20CotiMother: zero owner or spender"));
+        if (tokenOwner == address(0) || spender == address(0)) {
+            _sendApproveFailureToPod(id, tokenOwner, spender, bytes("PodErc20CotiMother: zero owner or spender"));
             return;
         }
 
-        _allowanceCiphertext[id][owner][spender] = MpcCore.offBoard(garbledAllowance);
+        _allowanceCiphertext[id][tokenOwner][spender] = MpcCore.offBoard(garbledAllowance);
 
-        ctUint256 memory ciphertextForOwner = MpcCore.offBoardToUser(garbledAllowance, owner);
+        ctUint256 memory ciphertextForOwner = MpcCore.offBoardToUser(garbledAllowance, tokenOwner);
         ctUint256 memory ciphertextForSpender = MpcCore.offBoardToUser(garbledAllowance, spender);
-        inbox.respond(abi.encode(owner, ciphertextForOwner, spender, ciphertextForSpender));
-        emit ApprovalCompleted(id, owner, spender, amountIsPublic, publicAmount);
+        inbox.respond(abi.encode(tokenOwner, ciphertextForOwner, spender, ciphertextForSpender));
+        emit ApprovalCompleted(id, tokenOwner, spender, amountIsPublic, publicAmount);
     }
 
     function _mintInternal(
@@ -508,9 +508,9 @@ contract PodErc20CotiMother is IPodErc20CotiSide, InboxUser, Ownable {
         inbox.raise(abi.encode(from, to, reason));
     }
 
-    function _sendApproveFailureToPod(bytes32 id, address owner, address spender, bytes memory reason) private {
-        emit ApprovalFailureRaised(id, owner, spender, reason);
-        inbox.raise(abi.encode(owner, spender, reason));
+    function _sendApproveFailureToPod(bytes32 id, address tokenOwner, address spender, bytes memory reason) private {
+        emit ApprovalFailureRaised(id, tokenOwner, spender, reason);
+        inbox.raise(abi.encode(tokenOwner, spender, reason));
     }
 
     function _sendSyncFailureToPod(bytes32 id, bytes memory reason) private {

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.20;
 
 /// @title IERC7984PortalWrapper
 /// @notice Partial ERC-7984 wrapper surface for PrivacyPortal deposit/withdraw explorer visibility.
