@@ -14,14 +14,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const here = path.dirname(fileURLToPath(import.meta.url));
 
 describe("PodErc20CotiMother public spender probe resistance", () => {
   it("source evaluates allowance before balance and unifies public spender failure reasons", () => {
     const src = fs.readFileSync(
-      path.join(here, "../../../contracts/pod/token/perc20/cotiside/PodErc20CotiMother.sol"),
+      path.join(__dirname, "../../../contracts/pod/token/perc20/cotiside/PodErc20CotiMother.sol"),
       "utf8"
     );
     const fnStart = src.indexOf("function _moveWithOptionalAllowance");
