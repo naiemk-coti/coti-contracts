@@ -9,11 +9,12 @@
  * 3. Encrypted (non-public) amounts still mux to zero and always Success — no public reason leak.
  *
  * Full MPC round-trip coverage lives in pod-ecosystem-integration system tests on COTI.
+ * Run: `node --test test/pod/token/PodErc20CotiMother.probeResistance.test.cjs`
  */
-import assert from "node:assert/strict";
-import { describe, it } from "node:test";
-import * as fs from "node:fs";
-import * as path from "node:path";
+const assert = require("node:assert/strict");
+const { describe, it } = require("node:test");
+const fs = require("node:fs");
+const path = require("node:path");
 
 describe("PodErc20CotiMother public spender probe resistance", () => {
   it("source evaluates allowance before balance and unifies public spender failure reasons", () => {
