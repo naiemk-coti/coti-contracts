@@ -79,8 +79,8 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
 
     // --- Errors ---
 
-    /// @notice Public-amount transfer, burn, or mint used a zero value.
-    error ZeroAmount();
+    /// @notice Owner rotated inbox and/or COTI peer for this pToken.
+    event PeerConfigured(address indexed inbox, address indexed cotiSideContract);
     /// @notice `syncBalances` account list is empty or exceeds {MAX_SYNC_BALANCE_ACCOUNTS}.
     error SyncBalancesInvalidLength(uint256 length);
     /// @notice `syncBalances` callback addresses/amounts length mismatch.
@@ -145,6 +145,7 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
         }
         cotiSideContract = cotiSideContract_;
         _setTrustedRemote(cotiChainId, cotiSideContract_);
+        emit PeerConfigured(address(inbox), cotiSideContract_);
     }
 
     // --- External: mutating (user / admin) ---
