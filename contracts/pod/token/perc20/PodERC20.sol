@@ -105,6 +105,8 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
     error RequestNotPending(bytes32 requestId, IPodERC20.RequestStatus status);
     /// @notice {killStaleRequest} called before {requestKillMinAge} elapsed.
     error RequestNotAged(bytes32 requestId, uint64 createdAt, uint64 minAge);
+    /// @notice Ownership cannot be renounced (admin must remain reachable).
+    error OwnershipCannotBeRenounced();
     /// @notice Thrown by the default {_checkMinter} hook; subclasses (e.g. {PodErc20Mintable}) can override to allow minting.
     error MintNotAllowed(address caller);
     /// @notice Clone storage was already initialized.
@@ -141,9 +143,16 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
     /// @dev `_sendPodTwoWay` may spend existing contract balance, so operational tooling can pre-fund this token for auto-fee flows.
     receive() external payable {}
 
+    /// @notice Ownership cannot be renounced (admin must remain reachable).
+    /// @dev Factory-owned clones must use {IPrivacyPortalFactoryAdmin.transferPTokenOwnership} for handoff.
+    function renounceOwnership() public pure override {
+        revert OwnershipCannotBeRenounced();
+    }
+
     /// @notice Owner-only: set inbox when `inbox_ != address(0)`; always updates COTI peer. {cotiChainId} is fixed at init.
     /// @param inbox_ New inbox address, or zero to leave the existing inbox unchanged.
     /// @param cotiSideContract_ New COTI-side ledger / MPC peer address.
+    /// @dev Factory-deployed tokens: call via {IPrivacyPortalFactoryAdmin.configurePToken}.
     function configure(address inbox_, address cotiSideContract_) external onlyOwner {
         if (cotiSideContract_ == address(0)) {
             revert PodERC20InvalidInitialization();
@@ -542,6 +551,8 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
         symbol = _symbol;
         decimals = _decimals;
         totalSupply = 0;
+        // Inline default — clones do not run the constructor storage initializer.
+        requestKillMinAge = 1 days;
     }
 
     /**
@@ -569,11 +580,13 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
     }
 
     /// @inheritdoc IPodERC20
+    /// @dev Factory-deployed tokens: call via {IPrivacyPortalFactoryAdmin.setPTokenRequestKillMinAge}.
     function setRequestKillMinAge(uint64 seconds_) external onlyOwner {
         requestKillMinAge = seconds_;
     }
 
     /// @inheritdoc IPodERC20
+    /// @dev Factory-deployed tokens: call via {IPrivacyPortalFactoryAdmin.killPTokenStaleRequest}.
     function killStaleRequest(bytes32 requestId) external onlyOwner {
         IPodERC20.RequestRecord storage rec = _requests[requestId];
         if (rec.status != IPodERC20.RequestStatus.Pending) {

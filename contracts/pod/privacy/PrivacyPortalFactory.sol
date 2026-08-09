@@ -73,6 +73,8 @@ contract PrivacyPortalFactory is IPrivacyPortalFactory, IPrivacyPortalFactoryAdm
     /// @notice Addresses blocked from deposits and withdrawals on factory-created portals.
     mapping(address => bool) public blacklisted;
 
+    /// @notice {DEPLOYER_ROLE} granted or revoked.
+    event DeployerUpdated(address indexed deployer, bool allowed);
     /// @notice Address added to the factory blacklist.
     event Blacklisted(address indexed account, address indexed by);
     /// @notice Address removed from the factory blacklist.
@@ -374,22 +376,47 @@ contract PrivacyPortalFactory is IPrivacyPortalFactory, IPrivacyPortalFactoryAdm
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        if (portalForPToken[pToken_] == address(0)) {
-            revert UnknownPToken(pToken_);
-        }
+        _requireFactoryOwnedPToken(pToken_);
         IPodERC20(pToken_).configure(inbox_, cotiSideContract_);
         emit PTokenConfigured(pToken_, inbox_, cotiSideContract_);
     }
 
     /// @notice Admin: transfer Ownable of a factory-deployed pToken (e.g. hand off after launch).
     function transferPTokenOwnership(address pToken_, address newOwner_) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (portalForPToken[pToken_] == address(0)) {
-            revert UnknownPToken(pToken_);
-        }
+        _requireFactoryOwnedPToken(pToken_);
         if (newOwner_ == address(0)) {
             revert InvalidAddress();
         }
         Ownable(pToken_).transferOwnership(newOwner_);
+    }
+
+    /// @notice Admin: rotate the authorized minter on a factory-owned pToken (factory is Ownable owner).
+    function setPTokenMinter(address pToken_, address newMinter_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _requireFactoryOwnedPToken(pToken_);
+        PodErc20Mintable(payable(pToken_)).setMinter(newMinter_);
+    }
+
+    /// @notice Admin: set {IPodERC20.requestKillMinAge} on a factory-owned pToken.
+    function setPTokenRequestKillMinAge(address pToken_, uint64 seconds_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _requireFactoryOwnedPToken(pToken_);
+        IPodERC20(pToken_).setRequestKillMinAge(seconds_);
+    }
+
+    /// @notice Admin: terminalize a stale Pending request on a factory-owned pToken via {IPodERC20.killStaleRequest}.
+    function killPTokenStaleRequest(address pToken_, bytes32 requestId) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _requireFactoryOwnedPToken(pToken_);
+        IPodERC20(pToken_).killStaleRequest(requestId);
+    }
+
+    /// @dev pToken must be factory-mapped and still Ownable-owned by this factory (after handoff, remount on the new factory).
+    function _requireFactoryOwnedPToken(address pToken_) private view {
+        if (portalForPToken[pToken_] == address(0)) {
+            revert UnknownPToken(pToken_);
+        }
+        address tokenOwner = Ownable(pToken_).owner();
+        if (tokenOwner != address(this)) {
+            revert PTokenNotOwnedByFactory(pToken_, tokenOwner);
+        }
     }
 
     /// @notice Admin: rotate the catastrophe rescue destination used by all portals from this factory.
@@ -540,8 +567,10 @@ contract PrivacyPortalFactory is IPrivacyPortalFactory, IPrivacyPortalFactoryAdm
         portal = Clones.clone(portalImplementation);
         pToken = Clones.clone(podTokenImplementation);
 
-        // Factory retains Ownable on the pToken so admins can {configurePToken} after inbox / mother upgrades.
-        // Portal minter is the portal; portal admin is factory {DEFAULT_ADMIN_ROLE} (no local Ownable).
+        // Factory retains Ownable on the pToken so admins can operate via forwarders:
+        // {configurePToken}, {setPTokenMinter}, {setPTokenRequestKillMinAge}, {killPTokenStaleRequest},
+        // {transferPTokenOwnership}. Portal minter is the portal; portal admin is factory
+        // {DEFAULT_ADMIN_ROLE} (no local Ownable — call the portal directly).
         PodErc20MintableInitializable(payable(pToken)).initialize(
             portal,
             address(this),

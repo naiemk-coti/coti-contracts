@@ -42,6 +42,20 @@ describe("Wave 5 portal/pToken guards", () => {
     assert.ok(src.includes("emit StaleRequestKilled"));
   });
 
+  it("L-31 factory: admin forwarders for factory-owned pToken admin ops", () => {
+    const factory = read("contracts/pod/privacy/PrivacyPortalFactory.sol");
+    const admin = read("contracts/pod/privacy/IPrivacyPortalFactoryAdmin.sol");
+    assert.ok(factory.includes("function setPTokenMinter"));
+    assert.ok(factory.includes("function setPTokenRequestKillMinAge"));
+    assert.ok(factory.includes("function killPTokenStaleRequest"));
+    assert.ok(admin.includes("function setPTokenMinter"));
+    assert.ok(admin.includes("function setPTokenRequestKillMinAge"));
+    assert.ok(admin.includes("function killPTokenStaleRequest"));
+    const ptoken = read("contracts/pod/token/perc20/PodERC20.sol");
+    assert.ok(ptoken.includes("function renounceOwnership"));
+    assert.ok(ptoken.includes("OwnershipCannotBeRenounced"));
+  });
+
   it("L-32: mother allowance-less paths renamed; permit uses transferOwnerPublic", () => {
     const mother = read("contracts/pod/token/perc20/cotiside/PodErc20CotiMother.sol");
     const iface = read("contracts/pod/token/perc20/cotiside/IPodErc20CotiSide.sol");

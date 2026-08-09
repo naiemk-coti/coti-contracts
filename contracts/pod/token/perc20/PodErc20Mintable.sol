@@ -91,6 +91,8 @@ contract PodErc20Mintable is PodERC20 {
 
     /// @notice Rotate the authorized minter (factory Ownable owner).
     /// @param newMinter Address authorized to mint; must not be zero.
+    /// @dev Factory-deployed tokens: call via {IPrivacyPortalFactoryAdmin.setPTokenMinter}
+    ///      (or remount via {createPortalWithExistingPToken}).
     function setMinter(address newMinter) external onlyOwner {
         if (newMinter == address(0)) {
             revert PodErc20MintableInvalidMinter();

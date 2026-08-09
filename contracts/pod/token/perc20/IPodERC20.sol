@@ -299,6 +299,8 @@ interface IPodERC20 {
      * @notice Owner: terminalize a Pending request that has aged past {requestKillMinAge}.
      * @dev Clears approval/transfer pending locks. Late Success is rejected by Pending-only status transitions.
      *      Does not release Privacy Portal escrow — pair with portal admin refund / ops recovery when needed.
+     *      Factory-deployed tokens (Ownable owner = factory): call via
+     *      {IPrivacyPortalFactoryAdmin.killPTokenStaleRequest}.
      */
     function killStaleRequest(bytes32 requestId) external;
 
@@ -306,6 +308,7 @@ interface IPodERC20 {
     function requestKillMinAge() external view returns (uint64);
 
     /// @notice Owner: set {requestKillMinAge} (`0` disables age gating — kill allowed immediately).
+    /// @dev Factory-deployed tokens: call via {IPrivacyPortalFactoryAdmin.setPTokenRequestKillMinAge}.
     function setRequestKillMinAge(uint64 seconds_) external;
 
     /// @dev Reserved: burn garbled amount; not supported in reference flows.
@@ -324,5 +327,6 @@ interface IPodERC20 {
     function syncBalances(address[] calldata accounts, uint256 callbackFeeLocalWei) external payable returns (bytes32 requestId);
 
     /// @notice Owner-only: set inbox when `inbox_ != address(0)`; always updates COTI peer. {cotiChainId} is fixed at init.
+    /// @dev Factory-deployed tokens: call via {IPrivacyPortalFactoryAdmin.configurePToken}.
     function configure(address inbox_, address cotiSideContract_) external;
 }
