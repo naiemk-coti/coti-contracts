@@ -58,19 +58,6 @@ interface IInboxMiner {
     ///      (error code `4`) and may emit a system-error return leg; further retries then revert.
     function retryFailedRequest(bytes32 requestId) external;
 
-    /// @notice Build the special {IInbox.MpcMethodCall} that marks an in-batch miner reject (no fat payload).
-    /// @dev Pass as {MinedRequest.methodCall} with the real header fields unchanged.
-    function buildMinerRejectMethodCall(uint8 rejectionCode, bytes32 rejectionReason)
-        external
-        pure
-        returns (IInbox.MpcMethodCall memory methodCall);
-
-    /// @notice Whether `methodCall` is the special in-batch reject encoding.
-    function isMinerRejectMethodCall(IInbox.MpcMethodCall memory methodCall)
-        external
-        pure
-        returns (bool isReject, uint8 rejectionCode, bytes32 rejectionReason);
-
     /// @notice Always-revert estimate of user execution gas and reply outbound sizes.
     /// @dev Intended for `eth_call`. Public. Nested call uses `maxUserGas` (and prepaid targetFee budget).
     ///      Reverts with {ExecutionGasEstimate}. `responseDataSize > 0` means `respond()` ran;
