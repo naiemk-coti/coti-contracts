@@ -20,6 +20,9 @@ import "../erc7984/PodErc7984Mixin.sol";
 contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Ownable {
     using MpcAbiCodec for MpcAbiCodec.MpcMethodCallContext;
 
+    /// @notice Maximum accounts per {syncBalances} batch (reply-size / gas bound).
+    uint256 public constant MAX_SYNC_BALANCE_ACCOUNTS = 64;
+
     // --- State variables ---
 
     uint256 public cotiChainId;
@@ -78,6 +81,10 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
 
     /// @notice Public-amount transfer, burn, or mint used a zero value.
     error ZeroAmount();
+    /// @notice `syncBalances` account list is empty or exceeds {MAX_SYNC_BALANCE_ACCOUNTS}.
+    error SyncBalancesInvalidLength(uint256 length);
+    /// @notice `syncBalances` callback addresses/amounts length mismatch.
+    error SyncBalancesLengthMismatch(uint256 addressesLength, uint256 amountsLength);
     /// @notice Transfer `from` and `to` were the same address.
     error SelfTransfer(address account);
     /// @notice An approval lock already exists for the owner/spender pair.
@@ -279,6 +286,9 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
      * @dev Does not change {pendingTransferCount}; only transfers/burns/mints adjust that counter.
      */
     function syncBalances(address[] calldata accounts, uint256 callbackFeeLocalWei) external payable returns (bytes32 requestId) {
+        if (accounts.length == 0 || accounts.length > MAX_SYNC_BALANCE_ACCOUNTS) {
+            revert SyncBalancesInvalidLength(accounts.length);
+        }
         IInbox.MpcMethodCall memory mpcMethodCall = MpcAbiCodec.create(IPodErc20CotiSide.syncBalances.selector, 1)
             .addArgument(accounts)
             .build();
@@ -369,6 +379,12 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
             data,
             (address[], ctUint256[], uint256)
         );
+        if (addresses.length != amounts.length) {
+            revert SyncBalancesLengthMismatch(addresses.length, amounts.length);
+        }
+        if (addresses.length > MAX_SYNC_BALANCE_ACCOUNTS) {
+            revert SyncBalancesInvalidLength(addresses.length);
+        }
         for (uint256 i = 0; i < addresses.length; i++) {
             if (balanceNonces[addresses[i]] < nonce) {
                 _balances[addresses[i]] = amounts[i];

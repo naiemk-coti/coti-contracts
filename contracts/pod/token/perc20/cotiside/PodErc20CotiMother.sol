@@ -26,6 +26,8 @@ contract PodErc20CotiMother is IPodErc20CotiSide, InboxUser, Ownable {
     ///      callback satisfies PoD `balanceNonces[account] < nonce` (PoD nonces default to 0).
     mapping(bytes32 => uint256) private _tokenNonce;
     uint256 private constant INITIAL_TOKEN_NONCE = 1;
+    /// @notice Maximum accounts per {syncBalances} batch (aligned with PoD {PodERC20.MAX_SYNC_BALANCE_ACCOUNTS}).
+    uint256 public constant MAX_SYNC_BALANCE_ACCOUNTS = 64;
     /// @dev Balance ciphertext per token and account.
     mapping(bytes32 => mapping(address => ctUint256)) private _balanceCiphertext;
     /// @dev Allowance ciphertext per token: `owner => spender => ctUint256`.
@@ -202,6 +204,10 @@ contract PodErc20CotiMother is IPodErc20CotiSide, InboxUser, Ownable {
         bytes32 id = _activeTokenId();
         if (accounts.length == 0) {
             _sendSyncFailureToPod(id, bytes("PodErc20CotiMother: empty accounts"));
+            return;
+        }
+        if (accounts.length > MAX_SYNC_BALANCE_ACCOUNTS) {
+            _sendSyncFailureToPod(id, bytes("PodErc20CotiMother: too many accounts"));
             return;
         }
 
