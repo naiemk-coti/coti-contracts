@@ -239,7 +239,7 @@ contract PodErc20CotiMother is IPodErc20CotiSide, InboxUser, Ownable {
     }
 
     /// @inheritdoc IPodErc20CotiSide
-    function transferFrom(
+    function transferOwner(
         address from,
         address to,
         gtUint256 value
@@ -248,7 +248,7 @@ contract PodErc20CotiMother is IPodErc20CotiSide, InboxUser, Ownable {
     }
 
     /// @inheritdoc IPodErc20CotiSide
-    function transferFromPublic(
+    function transferOwnerPublic(
         address from,
         address to,
         uint256 value
