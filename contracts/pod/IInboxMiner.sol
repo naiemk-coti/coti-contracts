@@ -17,8 +17,7 @@ interface IInboxMiner {
     error RequestSourceChainMismatch(bytes32 requestId, uint256 expectedSourceChainId, uint256 actualSourceChainId);
     /// @notice A mined request's encoded target chain is not this chain.
     error RequestTargetChainMismatch(bytes32 requestId, uint256 expectedTargetChainId, uint256 actualTargetChainId);
-    /// @notice Inbound message processing is paused (circuit breaker).
-    error MessageProcessingPaused();
+    /// @dev Circuit breaker also blocks outbound sends; see inbox `MessageProcessingPaused`.
 
     /// @notice Emitted when {retryFailedRequest} successfully re-executes a previously failed incoming request.
     event RetryFailedRequestSuccess(bytes32 indexed requestId);
