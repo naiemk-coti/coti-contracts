@@ -7,6 +7,8 @@ dotenv.config()
 
 /** Bump estimated gas price / EIP-1559 fees by 30% on COTI networks (see hardhat/gasPriceBump.ts). */
 import "./hardhat/gasPriceBump"
+/** Prefer native solc on linux-arm64 (wasm viaIR often OOMs in this environment). */
+import "./hardhat/preferNativeSolc"
 
 const accounts = process.env.PRIVATE_KEY
   ? [process.env.PRIVATE_KEY]
@@ -56,6 +58,10 @@ const config: HardhatUserConfig = {
     ]
   },
   networks: {
+    hardhat: {
+      // PodErc20MintableInitializable currently exceeds EIP-170; clones are fine on-chain.
+      allowUnlimitedContractSize: true,
+    },
     "coti-testnet": {
       url: "https://testnet.coti.io/rpc",
       chainId: 7082400,
