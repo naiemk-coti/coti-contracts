@@ -37,7 +37,7 @@ contract PodAdder128 is PodLib {
 
     /// @notice Receive the response and store the ciphertext result.
     /// @param data The response payload containing the ciphertext.
-    function receiveC(bytes memory data) external onlyInbox {
+    function receiveC(bytes memory data) external onlyMpcExecutor {
         _result = abi.decode(data, (ctUint128));
     }
 

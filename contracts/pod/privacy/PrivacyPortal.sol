@@ -17,7 +17,11 @@ import "./PrivacyPortalFeeLib.sol";
 
 /// @title PrivacyPortal
 /// @notice Locks a public ERC20 and mints/burns its PoD private pToken counterpart.
-/// @dev The portal never reads private balances. It only reacts to successful pToken callbacks and records public bridge obligations.
+/// @dev The portal never speaks to the inbox directly. Value-holding PoD messaging is confined to the
+///      paired {IPodERC20} (pToken), which authenticates inbound legs (peer for success, linked return
+///      leg for errors). The portal only reacts to successful pToken callbacks (e.g. {onPTokenTransferred}
+///      requires `msg.sender == address(pToken)`) and records public bridge obligations — prefer this
+///      indirection for anything that escrows user funds instead of putting inbox handlers on the portal.
 ///      Split deploy-then-initialize is unsafe on clones; use {PrivacyPortalFactory.createPortal} or an equivalent atomic path.
 ///      Admin/operator auth is resolved via {bindingFactory} (survives remount). Live deposit/withdraw entrypoints also require
 ///      a non-zero active {factory} binding (cleared on remount detach).

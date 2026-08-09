@@ -82,8 +82,6 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
     error SelfTransfer(address account);
     /// @notice An approval lock already exists for the owner/spender pair.
     error ApprovalAlreadyPending(address owner, address spender, bytes32 requestId);
-    /// @notice Inbox caller was not the configured COTI-side peer.
-    error OnlyCotiSideContract(uint256 remoteChainId, address remoteContract);
     /// @notice Error callback invoked outside a system-error or app-raise delivery context.
     error UnexpectedErrorContext();
     /// @notice Error delivery has no linked source request id.
@@ -137,6 +135,7 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
             setInbox(inbox_);
         }
         cotiSideContract = cotiSideContract_;
+        _setTrustedRemote(cotiChainId, cotiSideContract_);
     }
 
     // --- External: mutating (user / admin) ---
@@ -302,11 +301,7 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
      *      **Gotcha:** `to.call(callbackData)` uses all remaining gas; failures emit {RequestCallbackFailed} only.
      *      **Gotcha:** concurrent `transferAndCall` hooks may arrive out of order; receivers must key on `sourceRequestId`.
      */
-    function transferCallback(bytes memory data) external onlyInbox {
-        (uint256 remoteChainId, address remoteContract) = inbox.inboxMsgSender();
-        if (remoteChainId != cotiChainId || remoteContract != cotiSideContract) {
-            revert OnlyCotiSideContract(remoteChainId, remoteContract);
-        }
+    function transferCallback(bytes memory data) external onlyInboxPeer {
         bytes32 sourceRequestId = inbox.inboxSourceRequestId();
         _setRequestStatus(sourceRequestId, IPodERC20.RequestStatus.Success);
         (
@@ -348,11 +343,7 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
      * @notice Writes new allowance ciphertext after COTI approved the request.
      * @dev Clears the pending approval slot for `(owner, spender)`.
      */
-    function approveCallback(bytes memory data) external onlyInbox {
-        (uint256 remoteChainId, address remoteContract) = inbox.inboxMsgSender();
-        if (remoteChainId != cotiChainId || remoteContract != cotiSideContract) {
-            revert OnlyCotiSideContract(remoteChainId, remoteContract);
-        }
+    function approveCallback(bytes memory data) external onlyInboxPeer {
         bytes32 sourceRequestId = inbox.inboxSourceRequestId();
         _setRequestStatus(sourceRequestId, IPodERC20.RequestStatus.Success);
         (address owner, ctUint256 memory ownerAmount, address spender, ctUint256 memory spenderAmount) = abi.decode(
@@ -369,11 +360,7 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
      * @dev Per-account update only if `nonce` is newer than {balanceNonces}; emits {BalanceSynced} for each update applied.
      *      COTI callback nonces start at 1 when the pToken namespace is registered on the mother.
      */
-    function syncBalancesCallback(bytes memory data) external onlyInbox {
-        (uint256 remoteChainId, address remoteContract) = inbox.inboxMsgSender();
-        if (remoteChainId != cotiChainId || remoteContract != cotiSideContract) {
-            revert OnlyCotiSideContract(remoteChainId, remoteContract);
-        }
+    function syncBalancesCallback(bytes memory data) external onlyInboxPeer {
         bytes32 sourceRequestId = inbox.inboxSourceRequestId();
         _setRequestStatus(sourceRequestId, IPodERC20.RequestStatus.Success);
         (address[] memory addresses, ctUint256[] memory amounts, uint256 nonce) = abi.decode(
@@ -392,13 +379,13 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
     // --- External: inbox callbacks (errors) ---
     //
     // Pattern for `errorSelector(bytes data)` — system and app `raise` share this entrypoint:
-    //   1. Auth: onlyInbox; _errorCallbackContext() reverts unless SystemError/Exception + Pending link.
+    //   1. Auth: onlyInboxReturnLeg; _errorCallbackContext() reverts unless SystemError/Exception + Pending link.
     //   2. Branch on inboxErrorType():
     //        SystemError → {IInbox.ErrorData}: abi.encode(uint64 code, bytes message)
     //        Exception   → dApp raise layout for this selector
 
     /// @notice Clears pending transfer/mint/burn state after COTI failure.
-    function transferError(bytes memory data) external onlyInbox {
+    function transferError(bytes memory data) external onlyInboxReturnLeg {
         (IInbox.InboxErrorType errType, bytes32 sourceRequestId) = _errorCallbackContext();
         if (errType == IInbox.InboxErrorType.SystemError) {
             _handleSystemError(sourceRequestId, data);
@@ -412,7 +399,7 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
     }
 
     /// @notice Clears pending approval state after COTI failure.
-    function approveError(bytes memory data) external onlyInbox {
+    function approveError(bytes memory data) external onlyInboxReturnLeg {
         (IInbox.InboxErrorType errType, bytes32 sourceRequestId) = _errorCallbackContext();
         if (errType == IInbox.InboxErrorType.SystemError) {
             _handleSystemError(sourceRequestId, data);
@@ -426,7 +413,7 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
     }
 
     /// @notice Marks sync failed after COTI failure.
-    function syncBalancesError(bytes memory data) external onlyInbox {
+    function syncBalancesError(bytes memory data) external onlyInboxReturnLeg {
         (IInbox.InboxErrorType errType, bytes32 sourceRequestId) = _errorCallbackContext();
         if (errType == IInbox.InboxErrorType.SystemError) {
             _handleSystemError(sourceRequestId, data);
@@ -517,6 +504,7 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
         setInbox(_inbox);
         cotiChainId = _cotiChainId;
         cotiSideContract = _cotiSideContract;
+        _setTrustedRemote(_cotiChainId, _cotiSideContract);
         name = _name;
         symbol = _symbol;
         decimals = _decimals;
