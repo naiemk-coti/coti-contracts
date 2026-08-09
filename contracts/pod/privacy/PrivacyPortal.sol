@@ -881,7 +881,7 @@ contract PrivacyPortal is IPrivacyPortal, IERC7984PortalWrapper, Pausable, Reent
             withdrawal.recipient,
             withdrawalId,
             withdrawalId,
-            uint64(withdrawal.amount)
+            withdrawal.amount
         );
     }
 

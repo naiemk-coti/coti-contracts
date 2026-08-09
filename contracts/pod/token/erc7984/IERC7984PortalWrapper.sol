@@ -18,7 +18,7 @@ interface IERC7984PortalWrapper {
         address indexed receiver,
         bytes32 indexed unwrapRequestId,
         bytes32 encryptedAmount,
-        uint64 cleartextAmount
+        uint256 cleartextAmount
     );
 
     function underlying() external view returns (address);
