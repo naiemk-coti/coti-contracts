@@ -33,7 +33,8 @@ abstract contract PodUser is InboxUser, Ownable {
 
     /// @notice Restrict a function to inbox callbacks from the configured COTI MPC executor.
     /// @dev Reverts unless `msg.sender` is the inbox and the remote sender matches {cotiChainId} and {mpcExecutorAddress}.
-    ///      For callbacks that only need inbox verification, use {onlyInbox} from {InboxUser} instead.
+    ///      Prefer this (or {InboxUser.onlyInboxPeer} after {_setTrustedRemote}) for state-changing
+    ///      callbacks. Do **not** use bare {InboxUser.onlyInbox} alone — it is transport-only.
     modifier onlyMpcExecutor() {
         if (msg.sender != address(inbox)) {
             revert OnlyInbox(msg.sender);
@@ -54,5 +55,6 @@ abstract contract PodUser is InboxUser, Ownable {
             setInbox(inbox_);
         }
         configureCoti(mpcExecutor_, cotiChainId_);
+        _setTrustedRemote(cotiChainId_, mpcExecutor_);
     }
 }

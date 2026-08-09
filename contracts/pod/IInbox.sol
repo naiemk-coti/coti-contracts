@@ -60,7 +60,9 @@ interface IInbox {
         /// @notice Error selector invoked with `errorSelector(bytes data)` for app `raise` **or** Inbox system errors.
         /// @dev Same delivery path. Distinguish with {inboxErrorType()}: {SystemError} ({ErrorData} payload,
         ///      {SYSTEM_SENDER}) vs {Exception} (dApp-defined `raise` bytes). System errors are not eligible for
-        ///      `retryFailedRequest`. Auth: `onlyInbox` + non-zero {inboxSourceRequestId}.
+        ///      `retryFailedRequest`. Auth: {InboxUser.onlyInboxReturnLeg} (or equivalent:
+        ///      `onlyInbox` + non-zero {inboxSourceRequestId}). Do not require peer equality on
+        ///      system-error legs ({SYSTEM_SENDER}).
         bytes4 errorSelector;
         /// @notice True when a success response is expected.
         bool isTwoWay;
@@ -200,8 +202,9 @@ interface IInbox {
     function getIncomingRequest(bytes32 requestId) external view returns (Request memory);
 
     /// @notice Remote chain ID and contract for the currently executing incoming message.
-    /// @dev For system-error return legs, `contractAddress` is {SYSTEM_SENDER}. Success callbacks still
-    ///      come from the real remote peer; error callbacks should not require peer equality.
+    /// @dev For system-error return legs, `contractAddress` is {SYSTEM_SENDER}. Success / peer
+    ///      entrypoints should use peer auth ({InboxUser.onlyInboxPeer}). Error/system return legs
+    ///      should use linked-leg auth ({InboxUser.onlyInboxReturnLeg}) and must not require peer equality.
     /// @return chainId Remote chain ID.
     /// @return contractAddress Remote caller contract (or {SYSTEM_SENDER} for Inbox system errors).
     function inboxMsgSender() external view returns (uint256 chainId, address contractAddress);
@@ -217,8 +220,9 @@ interface IInbox {
     function inboxSourceRequestId() external view returns (bytes32);
 
     /// @notice Whether the current execution is delivering a system error, an app `raise`, or neither.
-    /// @dev Safe to call outside an active message (returns {InboxErrorType.NotErrorContext}). Prefer this over
-    ///      requiring `inboxMsgSender()` peer equality in error handlers.
+    /// @dev Safe to call outside an active message (returns {InboxErrorType.NotErrorContext}). Call only
+    ///      from error/`raise` handlers (typically behind {InboxUser.onlyInboxReturnLeg}); never from a
+    ///      success callback. Prefer this over requiring `inboxMsgSender()` peer equality in error handlers.
     /// @return errorType {InboxErrorType} for the active context.
     function inboxErrorType() external view returns (InboxErrorType errorType);
 
