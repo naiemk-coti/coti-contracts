@@ -142,6 +142,8 @@ contract PrivacyPortalFactory is IPrivacyPortalFactory, IPrivacyPortalFactoryAdm
     error DecimalsExceedsMaximum(uint8 provided, uint8 max);
     /// @notice `nativeWrappedUnderlying` does not match whether `underlying == nativeToken`.
     error NativeUnderlyingMismatch(address underlying, address nativeToken_, bool nativeWrapped);
+    /// @notice Implementation or oracle address has no contract code.
+    error ImplementationHasNoCode(address impl);
 
     /// @notice Restrict a function to an account with {DEPLOYER_ROLE}.
     modifier onlyDeployer() {
@@ -327,6 +329,9 @@ contract PrivacyPortalFactory is IPrivacyPortalFactory, IPrivacyPortalFactoryAdm
         if (portalImplementation_ == address(0)) {
             revert InvalidAddress();
         }
+        if (portalImplementation_.code.length == 0) {
+            revert ImplementationHasNoCode(portalImplementation_);
+        }
         address previous = portalImplementation;
         portalImplementation = portalImplementation_;
         emit PortalImplementationUpdated(previous, portalImplementation_);
@@ -340,6 +345,9 @@ contract PrivacyPortalFactory is IPrivacyPortalFactory, IPrivacyPortalFactoryAdm
     {
         if (podTokenImplementation_ == address(0)) {
             revert InvalidAddress();
+        }
+        if (podTokenImplementation_.code.length == 0) {
+            revert ImplementationHasNoCode(podTokenImplementation_);
         }
         address previous = podTokenImplementation;
         podTokenImplementation = podTokenImplementation_;
@@ -436,6 +444,9 @@ contract PrivacyPortalFactory is IPrivacyPortalFactory, IPrivacyPortalFactoryAdm
 
     /// @notice Upgrade or disable the portal fee oracle.
     function setPriceOracle(address newOracle) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (newOracle != address(0) && newOracle.code.length == 0) {
+            revert ImplementationHasNoCode(newOracle);
+        }
         address previous = address(priceOracle);
         priceOracle = IPodPriceOracle(newOracle);
         emit PriceOracleUpdated(previous, newOracle);
