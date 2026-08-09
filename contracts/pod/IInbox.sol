@@ -67,7 +67,9 @@ interface IInbox {
         /// @notice True after the inbox has processed this request (execution attempted) or, for an
         ///         original outbound two-way, after a linked return/error leg was *received*.
         /// @dev Does **not** mean the application callback committed. A return leg may still be in
-        ///      `errors` / retryable if the callback reverted. See {IncomingResponseReceived}.
+        ///      `errors` / retryable if the callback reverted. `IncomingResponseReceived` means the
+        ///      return leg was ingested; listen for `ReturnLegCallbackSucceeded` when you need the
+        ///      callback/error-handler subcall to have completed without recording an error.
         bool executed;
         /// @dev If this request is a one-way response or error delivery, links to the original two-way request ID.
         bytes32 sourceRequestId;
