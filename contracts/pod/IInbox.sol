@@ -144,13 +144,15 @@ interface IInbox {
 
     // --- External: execution (non-payable) ---
 
-    /// @notice Respond to the current incoming message (two-way flow).
-    /// @dev Gas for the return leg is **not** charged again: it uses the `callerFee` budget from the original two-way request.
+    /// @notice Respond to the current incoming two-way message.
+    /// @dev Reverts if the active request is one-way or has a zero `callbackSelector`.
+    ///      Gas for the return leg is **not** charged again: it uses the `callerFee` budget from the original two-way request.
     /// @param data Payload routed to the original sender via `callbackSelector`.
     function respond(bytes memory data) external;
 
     /// @notice Signal an application error for the current incoming two-way message (same routing constraints as {respond}).
-    /// @dev Gas for the return leg is **not** charged again: it uses the `callerFee` budget from the original two-way request.
+    /// @dev Reverts if the active request is one-way or has a zero `errorSelector`.
+    ///      Gas for the return leg is **not** charged again: it uses the `callerFee` budget from the original two-way request.
     /// @param data ABI-encoded argument for the remote `errorSelector(bytes)`.
     function raise(bytes memory data) external;
 
