@@ -140,6 +140,8 @@ contract PrivacyPortalFactory is IPrivacyPortalFactory, IPrivacyPortalFactoryAdm
     error DecimalsMismatch(uint8 expected, uint8 provided);
     /// @notice Requested `decimals` exceeded {MAX_DECIMALS}.
     error DecimalsExceedsMaximum(uint8 provided, uint8 max);
+    /// @notice `nativeWrappedUnderlying` does not match whether `underlying == nativeToken`.
+    error NativeUnderlyingMismatch(address underlying, address nativeToken_, bool nativeWrapped);
 
     /// @notice Restrict a function to an account with {DEPLOYER_ROLE}.
     modifier onlyDeployer() {
@@ -519,6 +521,9 @@ contract PrivacyPortalFactory is IPrivacyPortalFactory, IPrivacyPortalFactoryAdm
         if (underlyingDecimals != decimals) {
             revert DecimalsMismatch(underlyingDecimals, decimals);
         }
+        if (nativeWrappedUnderlying != (underlying == nativeToken)) {
+            revert NativeUnderlyingMismatch(underlying, nativeToken, nativeWrappedUnderlying);
+        }
 
         portal = Clones.clone(portalImplementation);
         pToken = Clones.clone(podTokenImplementation);
@@ -597,6 +602,9 @@ contract PrivacyPortalFactory is IPrivacyPortalFactory, IPrivacyPortalFactoryAdm
         uint8 underlyingDecimals = IERC20Metadata(underlying).decimals();
         if (underlyingDecimals != decimals) {
             revert DecimalsMismatch(underlyingDecimals, decimals);
+        }
+        if (nativeWrappedUnderlying != (underlying == nativeToken)) {
+            revert NativeUnderlyingMismatch(underlying, nativeToken, nativeWrappedUnderlying);
         }
 
         address oldPortal = existingPortalForPToken;
