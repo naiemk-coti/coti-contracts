@@ -14,9 +14,6 @@ abstract contract PodErc7984Mixin is IERC7984, ERC165 {
     /// @notice ERC-7572 metadata URI for explorers (optional).
     string public contractURI;
 
-    /// @dev Last confidential amount handle emitted on callback; portals may read for unwrap finalization events.
-    bytes32 public lastConfidentialTransferHandle;
-
     /// @dev ERC-7984 operator approvals (separate from async pToken allowance model).
     mapping(address => mapping(address => uint48)) private _operatorUntil;
 
@@ -116,7 +113,6 @@ abstract contract PodErc7984Mixin is IERC7984, ERC165 {
         ctUint256 memory receiverValue
     ) internal {
         bytes32 handle = Erc7984Pointers.transferAmountHandle(from, to, senderValue, receiverValue);
-        lastConfidentialTransferHandle = handle;
         emit ConfidentialTransfer(from, to, handle);
     }
 
