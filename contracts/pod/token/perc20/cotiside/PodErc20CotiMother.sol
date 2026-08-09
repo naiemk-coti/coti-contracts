@@ -365,6 +365,8 @@ contract PodErc20CotiMother is IPodErc20CotiSide, InboxUser, Ownable {
      * @dev Public amounts (`amountIsPublic`): decrypt comparisons and `raise` on insolvency (portal
      *      withdrawals need real Failure vs Success). Encrypted amounts: `mux` effective amount to
      *      zero when balance/allowance is insufficient and always `respond` Success (no leak).
+     *      On spender paths, allowance/auth is evaluated before balance so unapproved probes never
+     *      observe a balance comparison; public spender failures use one shared reason string.
      */
     function _moveWithOptionalAllowance(
         bytes32 id,
@@ -400,31 +402,42 @@ contract PodErc20CotiMother is IPodErc20CotiSide, InboxUser, Ownable {
         gtUint256 effectiveAmount;
         gtUint256 allowanceAfter;
         bool checkAllowance = spendAllowance && spender != from;
+        // Shared public failure reason so unauthorized probes cannot distinguish allowance vs balance.
+        bytes memory publicTransferFailed = bytes("PodErc20CotiMother: transfer failed");
 
         if (amountIsPublic) {
             // Public amounts: explicit Failure (portal withdrawals depend on real fail vs success).
-            if (!MpcCore.decrypt(MpcCore.ge(senderBalance, amount))) {
-                _sendTransferFailureToPod(id, from, to, bytes("PodErc20CotiMother: insufficient balance"));
-                return;
-            }
+            // Check allowance (auth) before balance so unapproved probes never decrypt a balance comparison.
             if (checkAllowance) {
                 gtUint256 currentAllowance = _readGarbledAllowance(id, from, spender);
                 if (!MpcCore.decrypt(MpcCore.ge(currentAllowance, amount))) {
-                    _sendTransferFailureToPod(id, from, to, bytes("PodErc20CotiMother: insufficient allowance"));
+                    _sendTransferFailureToPod(id, from, to, publicTransferFailed);
                     return;
                 }
                 allowanceAfter = MpcCore.sub(currentAllowance, amount);
             }
+            if (!MpcCore.decrypt(MpcCore.ge(senderBalance, amount))) {
+                _sendTransferFailureToPod(
+                    id,
+                    from,
+                    to,
+                    checkAllowance ? publicTransferFailed : bytes("PodErc20CotiMother: insufficient balance")
+                );
+                return;
+            }
             effectiveAmount = amount;
         } else {
             // Encrypted amounts: mux to zero on insolvency; always Success (no balance/allowance leak).
-            gtBool ok = MpcCore.ge(senderBalance, amount);
+            // Evaluate allowance before balance so precompile order matches the public path.
+            gtBool ok;
             if (checkAllowance) {
                 gtUint256 currentAllowance = _readGarbledAllowance(id, from, spender);
-                ok = MpcCore.and(ok, MpcCore.ge(currentAllowance, amount));
+                ok = MpcCore.ge(currentAllowance, amount);
+                ok = MpcCore.and(ok, MpcCore.ge(senderBalance, amount));
                 effectiveAmount = MpcCore.mux(ok, zeroAmount, amount);
                 allowanceAfter = MpcCore.sub(currentAllowance, effectiveAmount);
             } else {
+                ok = MpcCore.ge(senderBalance, amount);
                 // MpcCore.mux(bit, a, b) selects b when bit is true (COTI precompile polarity).
                 effectiveAmount = MpcCore.mux(ok, zeroAmount, amount);
             }
