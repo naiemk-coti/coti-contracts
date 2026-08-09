@@ -88,6 +88,8 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
     error ErrorRequestNotLinked();
     /// @notice Linked source request is not Pending (already settled or unknown).
     error ErrorRequestNotPending(bytes32 requestId, IPodERC20.RequestStatus status);
+    /// @notice Status transition requires Pending (monotonic settlement).
+    error RequestNotPending(bytes32 requestId, IPodERC20.RequestStatus status);
     /// @notice Thrown by the default {_checkMinter} hook; subclasses (e.g. {PodErc20Mintable}) can override to allow minting.
     error MintNotAllowed(address caller);
     /// @notice Clone storage was already initialized.
@@ -545,6 +547,15 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
     }
 
     function _setRequestStatus(bytes32 requestId, IPodERC20.RequestStatus status) internal {
+        IPodERC20.RequestStatus current = _requests[requestId].status;
+        if (
+            status == IPodERC20.RequestStatus.Success || status == IPodERC20.RequestStatus.Failed
+                || status == IPodERC20.RequestStatus.SystemFailed
+        ) {
+            if (current != IPodERC20.RequestStatus.Pending) {
+                revert RequestNotPending(requestId, current);
+            }
+        }
         _requests[requestId].status = status;
         emit RequestStatusUpdated(requestId, status);
     }
