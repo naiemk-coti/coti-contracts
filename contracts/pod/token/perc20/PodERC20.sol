@@ -76,11 +76,13 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
     event SyncBalancesRequested(address[] accounts, bytes32 requestId);
     /// @notice Inbox delivered a system error (encode/validateCiphertext); COTI app never ran; not retryable.
     event SystemRequestFailed(bytes32 indexed requestId, uint64 errorCode, bytes errorMessage);
+    /// @notice Owner rotated inbox and/or COTI peer for this pToken.
+    event PeerConfigured(address indexed inbox, address indexed cotiSideContract);
 
     // --- Errors ---
 
-    /// @notice Owner rotated inbox and/or COTI peer for this pToken.
-    event PeerConfigured(address indexed inbox, address indexed cotiSideContract);
+    /// @notice Public-amount transfer, burn, or mint used a zero value.
+    error ZeroAmount();
     /// @notice `syncBalances` account list is empty or exceeds {MAX_SYNC_BALANCE_ACCOUNTS}.
     error SyncBalancesInvalidLength(uint256 length);
     /// @notice `syncBalances` callback addresses/amounts length mismatch.
