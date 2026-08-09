@@ -608,6 +608,8 @@ contract PrivacyPortal is IPrivacyPortal, IERC7984PortalWrapper, Pausable, Reent
     ///      execute before calling this function.** A late mint success delivered after this refund would
     ///      mint pTokens against collateral that was already returned, creating unbacked supply. As a
     ///      cheap on-chain guard this reverts if the pToken already reports the mint {IPodERC20.RequestStatus.Success}.
+    ///      When the mint is still {IPodERC20.RequestStatus.Pending}, the portal first calls
+    ///      {IPodERC20.invalidatePendingRequest} so a late Success cannot settle after collateral is returned.
     ///      Portal protocol fee is kept.
     function adminRefundPendingDeposit(bytes32 requestId)
         external
@@ -624,6 +626,11 @@ contract PrivacyPortal is IPrivacyPortal, IERC7984PortalWrapper, Pausable, Reent
         IPodERC20.RequestStatus mintStatus = pToken.requests(requestId).status;
         if (mintStatus == IPodERC20.RequestStatus.Success) {
             revert DepositMintAlreadySucceeded(requestId);
+        }
+
+        // Invalidate before releasing collateral so a late mint Success cannot settle on the pToken.
+        if (mintStatus == IPodERC20.RequestStatus.Pending) {
+            pToken.invalidatePendingRequest(requestId);
         }
 
         uint256 amount = escrow.amount;
