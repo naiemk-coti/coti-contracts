@@ -45,15 +45,15 @@ interface IPodErc20CotiSide {
     function transferPublic(address from, address to, uint256 value) external;
 
     /**
-     * @notice Legacy same MPC move as {transfer}; kept for compatibility with older PoD tokens.
-     * @dev New allowance-based integrations should use {transferFromAsSpender}.
+     * @notice Legacy same MPC move as {transfer}; renamed so accidental ABI wiring fails.
+     * @dev Prefer {transferFromAsSpender}. EVM permit withdrawals use {transferOwnerPublic}.
      */
-    function transferFrom(address from, address to, gtUint256 value) external;
+    function transferOwner(address from, address to, gtUint256 value) external;
 
     /**
-     * @notice Legacy plain-amount variant of {transferFrom}; kept for compatibility with older PoD tokens.
+     * @notice Plain-amount owner move (no allowance check); used by EVM permit withdrawals.
      */
-    function transferFromPublic(address from, address to, uint256 value) external;
+    function transferOwnerPublic(address from, address to, uint256 value) external;
 
     /**
      * @notice Spender-aware transferFrom that consumes allowance on COTI before moving garbled `value`.
