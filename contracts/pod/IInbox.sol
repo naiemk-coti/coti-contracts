@@ -21,7 +21,7 @@ interface IInbox {
 
     /// @notice Minimal payload for Inbox system-error callbacks (`errorSelector(bytes data)`).
     /// @dev App `raise` payloads are dApp-defined; decode them only when {inboxErrorType()} is {Exception}.
-    ///      System encode failure uses `errorCode = 2`. Attribution is via {SYSTEM_SENDER} on the return leg.
+    ///      System encode failure uses `errorCode = 2`. Expired TTL uses `errorCode = 4`. Attribution is via {SYSTEM_SENDER} on the return leg.
     struct ErrorData {
         uint64 errorCode;
         bytes message;
@@ -162,9 +162,9 @@ interface IInbox {
 
     /// @notice Return error details for a failed outgoing / incoming request.
     /// @param requestId Request ID (outbound or mined incoming).
-    /// @return code Error code (`1` = execution failed, `2` = encode failed).
-    /// @return data Stored error bytes. For execution failures this is the first ≤256 bytes of
-    ///         returndata; decode `Error(string)` / custom errors in the client.
+    /// @return code Error code (`1` = execution failed, `2` = encode failed, `3` = miner rejected, `4` = expired).
+    /// @return data Stored error bytes. For execution or encode failures this is the first ≤256 bytes of
+    ///         the failure payload (inbox `MAX_ERROR_RETURN_DATA`); decode `Error(string)` / custom errors in the client.
     function getOutboxError(bytes32 requestId) external view returns (uint256 code, bytes memory data);
 
     /// @notice Return stored response bytes for a completed incoming flow.

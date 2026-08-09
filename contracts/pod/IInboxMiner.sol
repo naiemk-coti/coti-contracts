@@ -54,6 +54,8 @@ interface IInboxMiner {
     function setMessageProcessingPaused(bool paused) external;
 
     /// @notice Re-execute a mined incoming request whose target call failed (e.g. OOG). Open to any payer for gas.
+    /// @dev If owner-configured message lifetime has elapsed since dest ingest, terminalizes instead
+    ///      (error code `4`) and may emit a system-error return leg; further retries then revert.
     function retryFailedRequest(bytes32 requestId) external;
 
     /// @notice Build the special {IInbox.MpcMethodCall} that marks an in-batch miner reject (no fat payload).
