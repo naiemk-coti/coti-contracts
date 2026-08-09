@@ -193,4 +193,12 @@ contract MockPodERC20ForPortal {
     function markBurnStatus(bytes32 requestId, IPodERC20.RequestStatus status) external {
         _requestStatus[requestId] = status;
     }
+
+    function invalidatePendingRequest(bytes32 requestId) external {
+        require(_requestStatus[requestId] == IPodERC20.RequestStatus.Pending, "not pending");
+        _requestStatus[requestId] = IPodERC20.RequestStatus.Failed;
+        if (requestId == lastMintRequestId) {
+            _lastMintStatus = IPodERC20.RequestStatus.Failed;
+        }
+    }
 }

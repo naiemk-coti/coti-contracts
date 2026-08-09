@@ -283,6 +283,12 @@ interface IPodERC20 {
      */
     function mint(address to, uint256 amount, uint256 callbackFeeLocalWei) external payable returns (bytes32 requestId);
 
+    /**
+     * @notice Minter-only: mark a Pending request Failed and clear pending locks so a late Success cannot settle.
+     * @dev Used by Privacy Portal admin deposit refunds to prevent unbacked pToken mint after collateral return.
+     */
+    function invalidatePendingRequest(bytes32 requestId) external;
+
     /// @dev Reserved: burn garbled amount; not supported in reference flows.
     // function burnGt(gtUint256 amount) external returns (gtBool);
 

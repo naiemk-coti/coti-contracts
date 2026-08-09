@@ -525,6 +525,18 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
         }
     }
 
+    /// @notice Minter-only: mark a Pending request Failed and clear pending locks.
+    /// @dev Blocks a later Success callback from settling (monotonic status). Used when portal admin
+    ///      refunds deposit collateral while a mint is still Pending.
+    function invalidatePendingRequest(bytes32 requestId) external {
+        _checkMinter();
+        if (_requests[requestId].status != IPodERC20.RequestStatus.Pending) {
+            revert RequestNotPending(requestId, _requests[requestId].status);
+        }
+        _setRequestStatus(requestId, IPodERC20.RequestStatus.Failed);
+        _clearPendingByRequestId(requestId);
+    }
+
     /// @param totalValueWei Total native payment (e.g. `msg.value`); `callbackFeeLocalWei` is the caller-supplied callback slice.
     function _sendPodTwoWay(
         uint256 totalValueWei,
