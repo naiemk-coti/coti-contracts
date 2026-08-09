@@ -77,8 +77,8 @@ contract PrivacyPortalFactory is IPrivacyPortalFactory, IPrivacyPortalFactoryAdm
     event Blacklisted(address indexed account, address indexed by);
     /// @notice Address removed from the factory blacklist.
     event UnBlacklisted(address indexed account, address indexed by);
-    /// @notice Deployer allowlist entry changed.
-    event DeployerUpdated(address indexed deployer, bool allowed);
+    /// @notice Factory admin rotated inbox / COTI peer on a deployed pToken.
+    event PTokenConfigured(address indexed pToken, address indexed inbox, address indexed cotiSideContract);
     /// @notice A new portal and source-chain pToken clone pair was deployed.
     event PortalCreated(
         address indexed underlying,
@@ -370,6 +370,7 @@ contract PrivacyPortalFactory is IPrivacyPortalFactory, IPrivacyPortalFactoryAdm
             revert UnknownPToken(pToken_);
         }
         IPodERC20(pToken_).configure(inbox_, cotiSideContract_);
+        emit PTokenConfigured(pToken_, inbox_, cotiSideContract_);
     }
 
     /// @notice Admin: transfer Ownable of a factory-deployed pToken (e.g. hand off after launch).
