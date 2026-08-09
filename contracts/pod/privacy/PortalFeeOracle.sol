@@ -7,9 +7,13 @@ import "./IPodPriceOracle.sol";
 /// @title PortalFeeOracle
 /// @notice Testnet/manual oracle: all live reads return admin-set pegs (no external feeds).
 /// @dev Trust model: `owner` fully controls rates. Zero prices disable dynamic portal fees (fixed fee only).
+///      Admins validate any live oracle off-chain before wiring the factory — no on-chain interface gate.
 contract PortalFeeOracle is IPodPriceOracle, Ownable {
     /// @notice USD peg per token (18 decimals per whole token).
     mapping(address => uint256) public tokenPriceUSD;
+
+    /// @notice Timestamp of the last genuine {setTokenPriceUSD} write per token.
+    mapping(address => uint64) public tokenPriceUpdatedAt;
 
     /// @notice USD peg must be non-zero.
     error ZeroUsdPrice();
@@ -32,7 +36,23 @@ contract PortalFeeOracle is IPodPriceOracle, Ownable {
             revert ZeroUsdPrice();
         }
         tokenPriceUSD[token] = priceUsd;
+        tokenPriceUpdatedAt[token] = uint64(block.timestamp);
         emit TokenPriceUpdated(token, priceUsd);
+    }
+
+    /// @notice Clear the USD peg for `token` (dynamic fees fall back to fixed fee for that leg).
+    function clearTokenPriceUSD(address token) external onlyOwner {
+        if (token == address(0)) {
+            revert ZeroToken();
+        }
+        delete tokenPriceUSD[token];
+        delete tokenPriceUpdatedAt[token];
+        emit TokenPriceUpdated(token, 0);
+    }
+
+    /// @notice Price plus last-write timestamp for ops / health bots.
+    function getTokenPriceMeta(address token) external view returns (uint256 priceUsd, uint64 updatedAt) {
+        return (tokenPriceUSD[token], tokenPriceUpdatedAt[token]);
     }
 
     /// @inheritdoc IPodPriceOracle
