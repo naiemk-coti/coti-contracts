@@ -60,8 +60,8 @@ contract PrivacyPortalFactory is IPrivacyPortalFactory, IPrivacyPortalFactoryAdm
     /// @notice Factory default packed withdraw fee config.
     bytes32 public defaultWithdrawFeePacked;
 
-    /// @notice Addresses allowed to deploy portal/pToken pairs.
-    mapping(address => bool) public deployers;
+    /// @notice Addresses allowed to deploy portal/pToken pairs ({DEPLOYER_ROLE}).
+    bytes32 public constant DEPLOYER_ROLE = keccak256("DEPLOYER_ROLE");
     /// @notice Portal address by underlying ERC20.
     mapping(address => address) public portalForUnderlying;
     /// @notice Source-chain pToken address by underlying ERC20.
@@ -133,9 +133,9 @@ contract PrivacyPortalFactory is IPrivacyPortalFactory, IPrivacyPortalFactoryAdm
     /// @notice Requested `decimals` exceeded {MAX_DECIMALS}.
     error DecimalsExceedsMaximum(uint8 provided, uint8 max);
 
-    /// @notice Restrict a function to an allowlisted deployer.
+    /// @notice Restrict a function to an account with {DEPLOYER_ROLE}.
     modifier onlyDeployer() {
-        if (!deployers[msg.sender]) {
+        if (!hasRole(DEPLOYER_ROLE, msg.sender)) {
             revert OnlyDeployer(msg.sender);
         }
         _;
@@ -198,7 +198,7 @@ contract PrivacyPortalFactory is IPrivacyPortalFactory, IPrivacyPortalFactoryAdm
         defaultWithdrawFeePacked = PrivacyPortalFeeLib.packFeeConfig(
             defaultWithdrawFixedFee_, defaultWithdrawPercentageBps_, defaultWithdrawMaxFee_
         );
-        deployers[initialOwner] = true;
+        _grantRole(DEPLOYER_ROLE, initialOwner);
         emit DeployerUpdated(initialOwner, true);
         _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
         _grantRole(OPERATOR_ROLE, initialOwner);
@@ -262,12 +262,26 @@ contract PrivacyPortalFactory is IPrivacyPortalFactory, IPrivacyPortalFactoryAdm
         emit UnBlacklisted(account, msg.sender);
     }
 
-    /// @notice Add or remove a portal deployer.
+    /// @notice Whether `account` holds {DEPLOYER_ROLE}.
+    function isDeployer(address account) external view returns (bool) {
+        return hasRole(DEPLOYER_ROLE, account);
+    }
+
+    /// @notice Compatibility alias for {isDeployer} (historical `deployers` mapping getter).
+    function deployers(address account) external view returns (bool) {
+        return hasRole(DEPLOYER_ROLE, account);
+    }
+
+    /// @notice Add or remove a portal deployer ({DEPLOYER_ROLE}).
     function setDeployer(address deployer, bool allowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (deployer == address(0)) {
             revert InvalidAddress();
         }
-        deployers[deployer] = allowed;
+        if (allowed) {
+            _grantRole(DEPLOYER_ROLE, deployer);
+        } else {
+            _revokeRole(DEPLOYER_ROLE, deployer);
+        }
         emit DeployerUpdated(deployer, allowed);
     }
 
