@@ -94,8 +94,14 @@ interface IPodERC20 {
     /// @notice `syncBalances` refreshed `account` from the COTI ledger when the monotonic `nonce` allowed it.
     event BalanceSynced(address account, ctUint256 amount);
 
+    /// @notice Balance ciphertext was not applied because the account nonce was already current or newer.
+    event BalanceSyncSkipped(address indexed account, uint256 incomingNonce, uint256 currentNonce);
+
     /// @notice Lifecycle transition for an async inbox request submitted by this token.
     event RequestStatusUpdated(bytes32 indexed requestId, RequestStatus status);
+
+    /// @notice Owner killed a stale Pending request after the configured minimum age.
+    event StaleRequestKilled(bytes32 indexed requestId, address indexed account, address indexed spender);
 
     // --- Token metadata & supply ---
 
@@ -288,6 +294,19 @@ interface IPodERC20 {
      * @dev Used by Privacy Portal admin deposit refunds to prevent unbacked pToken mint after collateral return.
      */
     function invalidatePendingRequest(bytes32 requestId) external;
+
+    /**
+     * @notice Owner: terminalize a Pending request that has aged past {requestKillMinAge}.
+     * @dev Clears approval/transfer pending locks. Late Success is rejected by Pending-only status transitions.
+     *      Does not release Privacy Portal escrow — pair with portal admin refund / ops recovery when needed.
+     */
+    function killStaleRequest(bytes32 requestId) external;
+
+    /// @notice Minimum age (seconds) before {killStaleRequest} may terminalize a Pending request.
+    function requestKillMinAge() external view returns (uint64);
+
+    /// @notice Owner: set {requestKillMinAge} (`0` disables age gating — kill allowed immediately).
+    function setRequestKillMinAge(uint64 seconds_) external;
 
     /// @dev Reserved: burn garbled amount; not supported in reference flows.
     // function burnGt(gtUint256 amount) external returns (gtBool);

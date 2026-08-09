@@ -61,6 +61,10 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
     mapping(bytes32 => bytes) public failedRequests;
     /// @dev Monotonic nonce from COTI; stale callbacks do not overwrite newer balances.
     mapping(address => uint256) public balanceNonces;
+    /// @notice Timestamp when a request last entered Pending (for {killStaleRequest}).
+    mapping(bytes32 => uint64) public requestCreatedAt;
+    /// @notice Minimum age (seconds) before {killStaleRequest} may terminalize a Pending request (`0` = no wait).
+    uint64 public requestKillMinAge = 1 days;
 
     // --- Events (PoD-specific; {Transfer}, {Approval}, etc. are declared on {IPodERC20}) ---
 
@@ -99,6 +103,8 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
     error ErrorRequestNotPending(bytes32 requestId, IPodERC20.RequestStatus status);
     /// @notice Status transition requires Pending (monotonic settlement).
     error RequestNotPending(bytes32 requestId, IPodERC20.RequestStatus status);
+    /// @notice {killStaleRequest} called before {requestKillMinAge} elapsed.
+    error RequestNotAged(bytes32 requestId, uint64 createdAt, uint64 minAge);
     /// @notice Thrown by the default {_checkMinter} hook; subclasses (e.g. {PodErc20Mintable}) can override to allow minting.
     error MintNotAllowed(address caller);
     /// @notice Clone storage was already initialized.
@@ -333,12 +339,16 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
             if (balanceNonces[from] < nonce) {
                 _balances[from] = newBalanceFrom;
                 balanceNonces[from] = nonce;
+            } else {
+                emit BalanceSyncSkipped(from, nonce, balanceNonces[from]);
             }
         }
         if (to != address(0)) {
             if (balanceNonces[to] < nonce) {
                 _balances[to] = newBalanceTo;
                 balanceNonces[to] = nonce;
+            } else {
+                emit BalanceSyncSkipped(to, nonce, balanceNonces[to]);
             }
         }
         bytes memory callbackData = _requestCallbacks[sourceRequestId];
@@ -393,6 +403,8 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
                 _balances[addresses[i]] = amounts[i];
                 balanceNonces[addresses[i]] = nonce;
                 emit BalanceSynced(addresses[i], amounts[i]);
+            } else {
+                emit BalanceSyncSkipped(addresses[i], nonce, balanceNonces[addresses[i]]);
             }
         }
     }
@@ -556,6 +568,29 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
         _clearPendingByRequestId(requestId);
     }
 
+    /// @inheritdoc IPodERC20
+    function setRequestKillMinAge(uint64 seconds_) external onlyOwner {
+        requestKillMinAge = seconds_;
+    }
+
+    /// @inheritdoc IPodERC20
+    function killStaleRequest(bytes32 requestId) external onlyOwner {
+        IPodERC20.RequestRecord storage rec = _requests[requestId];
+        if (rec.status != IPodERC20.RequestStatus.Pending) {
+            revert RequestNotPending(requestId, rec.status);
+        }
+        uint64 createdAt = requestCreatedAt[requestId];
+        uint64 minAge = requestKillMinAge;
+        if (minAge != 0 && (createdAt == 0 || block.timestamp < uint256(createdAt) + uint256(minAge))) {
+            revert RequestNotAged(requestId, createdAt, minAge);
+        }
+        address account = rec.account;
+        address spender = rec.spender;
+        _setRequestStatus(requestId, IPodERC20.RequestStatus.Failed);
+        _clearPendingByRequestId(requestId);
+        emit StaleRequestKilled(requestId, account, spender);
+    }
+
     /// @param totalValueWei Total native payment (e.g. `msg.value`); `callbackFeeLocalWei` is the caller-supplied callback slice.
     function _sendPodTwoWay(
         uint256 totalValueWei,
@@ -588,6 +623,9 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
             }
         }
         _requests[requestId].status = status;
+        if (status == IPodERC20.RequestStatus.Pending) {
+            requestCreatedAt[requestId] = uint64(block.timestamp);
+        }
         emit RequestStatusUpdated(requestId, status);
     }
 
@@ -858,7 +896,7 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
         emit TransferRequestSubmitted(address(0), to, requestId);
     }
 
-    /// @dev Plain-uint256 transfer / transferFrom; sends to `IPodErc20CotiSide.transferPublic` / `transferFromPublic`.
+    /// @dev Plain-uint256 transfer / transferFrom; sends to `IPodErc20CotiSide.transferPublic` / spender or owner variants.
     function _transferPublic(
         bytes4 remoteSelector,
         address from,
@@ -944,7 +982,7 @@ contract PodERC20 is IPodERC20, InboxUser, PodErc7984Mixin, ReentrancyGuard, Own
         }
         _consumePublicTransferPermit(from, spender, to, amount, permit);
 
-        IInbox.MpcMethodCall memory mpcMethodCall = MpcAbiCodec.create(IPodErc20CotiSide.transferFromPublic.selector, 3)
+        IInbox.MpcMethodCall memory mpcMethodCall = MpcAbiCodec.create(IPodErc20CotiSide.transferOwnerPublic.selector, 3)
             .addArgument(from)
             .addArgument(to)
             .addArgument(amount)
