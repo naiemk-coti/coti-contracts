@@ -112,7 +112,9 @@ interface IInbox {
     /// @param targetContract Contract to call on the destination chain.
     /// @param methodCall Calldata and MPC metadata.
     /// @param callbackSelector Selector invoked on the source chain when the remote call succeeds.
+    ///      Must be non-zero and different from `errorSelector`.
     /// @param errorSelector Selector invoked on the source chain when the remote call fails.
+    ///      Must be non-zero and different from `callbackSelector`.
     /// @param callbackFeeLocalWei Wei from `msg.value` reserved for the callback leg (converted to gas units in fee logic).
     /// @return requestId The new outbound request ID.
     function sendTwoWayMessage(
