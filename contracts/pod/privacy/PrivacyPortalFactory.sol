@@ -36,6 +36,8 @@ contract PrivacyPortalFactory is IPrivacyPortalFactory, IPrivacyPortalFactoryAdm
 
     /// @dev Primary admin for {owner()} tooling; kept in sync with {DEFAULT_ADMIN_ROLE} grants/revokes.
     address private _owner;
+    /// @dev Count of {DEFAULT_ADMIN_ROLE} holders (for last-admin protection).
+    uint256 private _adminCount;
     /// @notice Source-chain inbox used by pToken clones and registration messages.
     address public inbox;
     /// @notice COTI chain id used by pToken clones for remote MPC execution.
@@ -128,6 +130,12 @@ contract PrivacyPortalFactory is IPrivacyPortalFactory, IPrivacyPortalFactoryAdm
     error OracleNotConfigured();
     /// @notice No {DEFAULT_ADMIN_ROLE} holder is configured.
     error AdminNotConfigured();
+    /// @notice Cannot revoke or renounce the last {DEFAULT_ADMIN_ROLE}.
+    error CannotRevokeLastAdmin();
+    /// @notice Primary {owner()} must {transferPrimaryOwner} before that account loses admin.
+    error PrimaryOwnerMustTransferFirst(address primaryOwner);
+    /// @notice New primary owner must already hold {DEFAULT_ADMIN_ROLE}.
+    error PrimaryOwnerNotAdmin(address account);
     /// @notice Requested `decimals` did not match `IERC20Metadata(underlying).decimals()`.
     error DecimalsMismatch(uint8 expected, uint8 provided);
     /// @notice Requested `decimals` exceeded {MAX_DECIMALS}.
@@ -223,18 +231,42 @@ contract PrivacyPortalFactory is IPrivacyPortalFactory, IPrivacyPortalFactoryAdm
         return hasRole(DEFAULT_ADMIN_ROLE, account);
     }
 
+    /// @notice Transfer the primary {owner()} pointer to another existing admin.
+    /// @dev Does not grant/revoke roles; `newOwner` must already hold {DEFAULT_ADMIN_ROLE}.
+    function transferPrimaryOwner(address newOwner) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (newOwner == address(0) || !hasRole(DEFAULT_ADMIN_ROLE, newOwner)) {
+            revert PrimaryOwnerNotAdmin(newOwner);
+        }
+        _owner = newOwner;
+    }
+
     function _grantRole(bytes32 role, address account) internal override returns (bool) {
         bool granted = super._grantRole(role, account);
-        if (granted && role == DEFAULT_ADMIN_ROLE && _owner == address(0)) {
-            _owner = account;
+        if (granted && role == DEFAULT_ADMIN_ROLE) {
+            unchecked {
+                ++_adminCount;
+            }
+            if (_owner == address(0)) {
+                _owner = account;
+            }
         }
         return granted;
     }
 
     function _revokeRole(bytes32 role, address account) internal override returns (bool) {
+        if (role == DEFAULT_ADMIN_ROLE) {
+            if (_adminCount <= 1) {
+                revert CannotRevokeLastAdmin();
+            }
+            if (account == _owner) {
+                revert PrimaryOwnerMustTransferFirst(_owner);
+            }
+        }
         bool revoked = super._revokeRole(role, account);
-        if (revoked && role == DEFAULT_ADMIN_ROLE && account == _owner) {
-            _owner = address(0);
+        if (revoked && role == DEFAULT_ADMIN_ROLE) {
+            unchecked {
+                --_adminCount;
+            }
         }
         return revoked;
     }

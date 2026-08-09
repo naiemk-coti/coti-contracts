@@ -14,6 +14,9 @@ abstract contract InboxUser {
     /// @notice Registered remote peer per source chain id (`inboxMsgSender` remote contract).
     mapping(uint256 => address) public trustedRemote;
 
+    /// @notice Configured inbox address was updated.
+    event InboxUpdated(address indexed previousInbox, address indexed newInbox);
+
     /// @notice Caller is not the configured inbox.
     error OnlyInbox(address caller);
 
@@ -71,7 +74,9 @@ abstract contract InboxUser {
         if (_inbox == address(0)) {
             revert ZeroInbox();
         }
+        address previous = address(inbox);
         inbox = IInbox(_inbox);
+        emit InboxUpdated(previous, _inbox);
     }
 
     /// @notice Register the expected remote peer for `chainId_`.
