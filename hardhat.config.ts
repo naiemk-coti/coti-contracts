@@ -30,7 +30,7 @@ const config: HardhatUserConfig = {
           optimizer: {
             enabled: true,
             // Prefer create-size headroom under the 24_576-byte Spurious Dragon limit (higher runs → larger code).
-            runs: 200,
+            runs: 1,
           },
           metadata: {
             // do not include the metadata hash, since this is machine dependent
@@ -48,7 +48,7 @@ const config: HardhatUserConfig = {
           viaIR: true,
           optimizer: {
             enabled: true,
-            runs: 200,
+            runs: 1,
           },
           metadata: {
             bytecodeHash: 'none',
@@ -59,8 +59,8 @@ const config: HardhatUserConfig = {
   },
   networks: {
     hardhat: {
-      // PodErc20MintableInitializable currently exceeds EIP-170; clones are fine on-chain.
-      allowUnlimitedContractSize: true,
+      // Keep false so local deploys match EIP-170 (24_576). See `npm run check:bytecode-size`.
+      allowUnlimitedContractSize: false,
     },
     "coti-testnet": {
       url: "https://testnet.coti.io/rpc",
