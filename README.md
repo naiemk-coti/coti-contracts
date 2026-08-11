@@ -28,6 +28,13 @@ npm install
 npx hardhat test
 ```
 
+## Ecosystem CI dispatch
+
+On push to `main`, [`.github/workflows/dispatch-pei.yml`](./.github/workflows/dispatch-pei.yml) can notify **pod-ecosystem-integration** via `repository_dispatch` (`pod-contracts-changed`) so PEI in-mem/sim Hardhat jobs re-run against this commit.
+
+Requires repo secret **`PEI_DISPATCH_PAT`**. Full setup (PAT permissions, smoke test, PEI `CROSS_REPO_PAT`):  
+[pod-ecosystem-integration/docs/CI-CD.md](https://github.com/coti-io/pod-ecosystem-integration/blob/main/docs/CI-CD.md)
+
 ---
 
 To report an issue, please see the [issues](https://github.com/coti-io/coti-contracts/issues/new) tab.
