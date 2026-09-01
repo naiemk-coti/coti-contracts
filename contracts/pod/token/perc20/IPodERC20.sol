@@ -61,9 +61,47 @@ interface IPodERC20 {
         bytes32 s;
     }
 
-    // --- Functions ---
-    // Events ({Transfer}, {Approval}, etc.) are declared on {PodERC20} / {PodERC20Burnable}, not here,
-    // so the bare base can emit without implementing {burn}.
+    // --- Events ---
+
+    /**
+     * @notice Tokens moved from `from` to `to` after the COTI leg succeeded and this contract applied ciphertext updates.
+     * @dev `senderValue` / `receiverValue` are the same logical amount re-encrypted for each party; either may be zero in edge cases.
+     */
+    event Transfer(
+        address indexed from,
+        address indexed to,
+        ctUint256 senderValue,
+        ctUint256 receiverValue
+    );
+
+    /// @notice The asynchronous transfer failed on the COTI side or was rejected before balances were updated.
+    event TransferFailed(address indexed from, address indexed to, bytes errorMsg);
+
+    /**
+     * @notice Allowance for `spender` on `owner` was updated after a successful COTI `approve`.
+     * @dev `ownerValue` and `spenderValue` encrypt the same allowance amount for different AES keys.
+     */
+    event Approval(
+        address indexed owner,
+        address indexed spender,
+        ctUint256 ownerValue,
+        ctUint256 spenderValue
+    );
+
+    /// @notice `transferAndCall` delivered tokens but the post-transfer `to.call(callbackData)` reverted or ran out of gas.
+    event RequestCallbackFailed(address from, address to, bytes32 requestId, bytes callbackData);
+
+    /// @notice `syncBalances` refreshed `account` from the COTI ledger when the monotonic `nonce` allowed it.
+    event BalanceSynced(address account, ctUint256 amount);
+
+    /// @notice Balance ciphertext was not applied because the account nonce was already current or newer.
+    event BalanceSyncSkipped(address indexed account, uint256 incomingNonce, uint256 currentNonce);
+
+    /// @notice Lifecycle transition for an async inbox request submitted by this token.
+    event RequestStatusUpdated(bytes32 indexed requestId, RequestStatus status);
+
+    /// @notice Owner killed a stale Pending request after the configured minimum age.
+    event StaleRequestKilled(bytes32 indexed requestId, address indexed account, address indexed spender);
 
     // --- Token metadata & supply ---
 

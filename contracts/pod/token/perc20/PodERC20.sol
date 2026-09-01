@@ -67,27 +67,6 @@ contract PodERC20 is InboxUser, PodErc7984Mixin, ReentrancyGuard, Ownable {
     /// @notice Minimum age (seconds) before {killStaleRequest} may terminalize a Pending request (`0` = no wait).
     uint64 public requestKillMinAge = 1 days;
 
-    // --- Events ({IPodERC20} events redeclared here so {PodERC20} can emit without implementing burn) ---
-
-    event Transfer(
-        address indexed from,
-        address indexed to,
-        ctUint256 senderValue,
-        ctUint256 receiverValue
-    );
-    event TransferFailed(address indexed from, address indexed to, bytes errorMsg);
-    event Approval(
-        address indexed owner,
-        address indexed spender,
-        ctUint256 ownerValue,
-        ctUint256 spenderValue
-    );
-    event RequestCallbackFailed(address from, address to, bytes32 requestId, bytes callbackData);
-    event BalanceSynced(address account, ctUint256 amount);
-    event BalanceSyncSkipped(address indexed account, uint256 incomingNonce, uint256 currentNonce);
-    event RequestStatusUpdated(bytes32 indexed requestId, IPodERC20.RequestStatus status);
-    event StaleRequestKilled(bytes32 indexed requestId, address indexed account, address indexed spender);
-
     // --- Events (PoD-specific) ---
 
     /// @notice Async transfer request was submitted to COTI.
@@ -361,7 +340,7 @@ contract PodERC20 is InboxUser, PodErc7984Mixin, ReentrancyGuard, Ownable {
                 _balances[from] = newBalanceFrom;
                 balanceNonces[from] = nonce;
             } else {
-                emit BalanceSyncSkipped(from, nonce, balanceNonces[from]);
+                emit IPodERC20.BalanceSyncSkipped(from, nonce, balanceNonces[from]);
             }
         }
         if (to != address(0)) {
@@ -369,18 +348,18 @@ contract PodERC20 is InboxUser, PodErc7984Mixin, ReentrancyGuard, Ownable {
                 _balances[to] = newBalanceTo;
                 balanceNonces[to] = nonce;
             } else {
-                emit BalanceSyncSkipped(to, nonce, balanceNonces[to]);
+                emit IPodERC20.BalanceSyncSkipped(to, nonce, balanceNonces[to]);
             }
         }
         bytes memory callbackData = _requestCallbacks[sourceRequestId];
-        emit Transfer(from, to, senderValue, receiverValue);
+        emit IPodERC20.Transfer(from, to, senderValue, receiverValue);
         _emitConfidentialTransfer(from, to, senderValue, receiverValue);
         if (callbackData.length != 0) {
             (bool success, ) = address(to).call(callbackData);
             if (success) {
                 delete _requestCallbacks[sourceRequestId];
             } else {
-                emit RequestCallbackFailed(from, to, sourceRequestId, callbackData);
+                emit IPodERC20.RequestCallbackFailed(from, to, sourceRequestId, callbackData);
             }
         }
     }
@@ -398,7 +377,7 @@ contract PodERC20 is InboxUser, PodErc7984Mixin, ReentrancyGuard, Ownable {
         );
         _clearPendingByRequestId(sourceRequestId);
         _allowance[owner][spender] = IPodERC20.Allowance({spenderCiphertext: spenderAmount, ownerCiphertext: ownerAmount});
-        emit Approval(owner, spender, ownerAmount, spenderAmount);
+        emit IPodERC20.Approval(owner, spender, ownerAmount, spenderAmount);
     }
 
     /**
@@ -423,9 +402,9 @@ contract PodERC20 is InboxUser, PodErc7984Mixin, ReentrancyGuard, Ownable {
             if (balanceNonces[addresses[i]] < nonce) {
                 _balances[addresses[i]] = amounts[i];
                 balanceNonces[addresses[i]] = nonce;
-                emit BalanceSynced(addresses[i], amounts[i]);
+                emit IPodERC20.BalanceSynced(addresses[i], amounts[i]);
             } else {
-                emit BalanceSyncSkipped(addresses[i], nonce, balanceNonces[addresses[i]]);
+                emit IPodERC20.BalanceSyncSkipped(addresses[i], nonce, balanceNonces[addresses[i]]);
             }
         }
     }
@@ -449,7 +428,7 @@ contract PodERC20 is InboxUser, PodErc7984Mixin, ReentrancyGuard, Ownable {
         _setRequestStatus(sourceRequestId, IPodERC20.RequestStatus.Failed);
         failedRequests[sourceRequestId] = errorMsg;
         _clearPendingByRequestId(sourceRequestId);
-        emit TransferFailed(from, to, errorMsg);
+        emit IPodERC20.TransferFailed(from, to, errorMsg);
     }
 
     /// @notice Clears pending approval state after COTI failure.
@@ -613,7 +592,7 @@ contract PodERC20 is InboxUser, PodErc7984Mixin, ReentrancyGuard, Ownable {
         address spender = rec.spender;
         _setRequestStatus(requestId, IPodERC20.RequestStatus.Failed);
         _clearPendingByRequestId(requestId);
-        emit StaleRequestKilled(requestId, account, spender);
+        emit IPodERC20.StaleRequestKilled(requestId, account, spender);
     }
 
     /// @param totalValueWei Total native payment (e.g. `msg.value`); `callbackFeeLocalWei` is the caller-supplied callback slice.
@@ -651,7 +630,7 @@ contract PodERC20 is InboxUser, PodErc7984Mixin, ReentrancyGuard, Ownable {
         if (status == IPodERC20.RequestStatus.Pending) {
             requestCreatedAt[requestId] = uint64(block.timestamp);
         }
-        emit RequestStatusUpdated(requestId, status);
+        emit IPodERC20.RequestStatusUpdated(requestId, status);
     }
 
     /// @dev Record an in-flight transfer/burn (`recipientLocked=false`) or mint (`recipientLocked=true`); increments {pendingTransferCount}.
@@ -702,7 +681,7 @@ contract PodERC20 is InboxUser, PodErc7984Mixin, ReentrancyGuard, Ownable {
         if (spender != address(0)) {
             emit ApprovalFailed(account, spender, errorMessage);
         } else if (account != address(0) || recipientLocked) {
-            emit TransferFailed(
+            emit IPodERC20.TransferFailed(
                 recipientLocked ? address(0) : account,
                 recipientLocked ? account : address(0),
                 errorMessage
